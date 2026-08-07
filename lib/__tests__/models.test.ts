@@ -9,6 +9,7 @@ vi.mock("@ai-sdk/gateway", () => ({
 }));
 
 afterEach(() => {
+  vi.useRealTimers();
   gatewayMock.getAvailableModels.mockReset();
   vi.restoreAllMocks();
   vi.resetModules();
@@ -142,6 +143,55 @@ describe("provider model discovery", () => {
         provider: "google",
       },
     ]);
+  });
+
+  it("falls back when Gateway model discovery stalls", async () => {
+    vi.useFakeTimers();
+    vi.stubEnv("AI_GATEWAY_API_KEY", "vck_test");
+    gatewayMock.getAvailableModels.mockImplementation(
+      () => new Promise(() => undefined)
+    );
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      json: () =>
+        Promise.resolve({
+          data: [{ id: "google/gemini-3.5-flash", name: "Gemini 3.5 Flash" }],
+        }),
+      ok: true,
+    } as Response);
+    const { fetchGatewayModels } = await import("../ai/models");
+
+    const result = fetchGatewayModels();
+    await vi.advanceTimersByTimeAsync(5000);
+
+    await expect(result).resolves.toEqual([
+      {
+        description: "",
+        id: "google/gemini-3.5-flash",
+        name: "Gemini 3.5 Flash",
+        provider: "google",
+      },
+    ]);
+  });
+
+  it("aborts a stalled OpenCode Go catalog request", async () => {
+    vi.useFakeTimers();
+    vi.stubEnv("OPENCODE_API_KEY", "oc_test");
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      (_input, init) =>
+        new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener(
+            "abort",
+            () => reject(new DOMException("Aborted", "AbortError")),
+            { once: true }
+          );
+        })
+    );
+    const { fetchOpenCodeGoModels } = await import("../ai/models");
+
+    const result = fetchOpenCodeGoModels();
+    await vi.advanceTimersByTimeAsync(5000);
+
+    await expect(result).resolves.toEqual([]);
   });
 
   it("marks direct OpenAI GPT-5 models as reasoning-capable", async () => {

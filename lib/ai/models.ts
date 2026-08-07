@@ -69,6 +69,7 @@ export type ModelPricing = {
 };
 
 const MAX_MODELS_TOTAL = 80;
+const MODEL_CATALOG_TIMEOUT_MS = 5000;
 const DEFAULT_PROVIDER_LIMIT = 12;
 const OPENROUTER_PROVIDER_LIMIT = 48;
 const PROVIDER_SORT_ORDER = [
@@ -248,13 +249,39 @@ function uniqueModels(models: ChatModel[]) {
   });
 }
 
+async function withCatalogTimeout<T>(
+  operation: (signal: AbortSignal) => Promise<T>
+) {
+  const controller = new AbortController();
+  let timeout: ReturnType<typeof globalThis.setTimeout> | undefined;
+  const timeoutResult = new Promise<never>((_resolve, reject) => {
+    timeout = globalThis.setTimeout(() => {
+      controller.abort();
+      reject(new DOMException("Model catalog timed out", "TimeoutError"));
+    }, MODEL_CATALOG_TIMEOUT_MS);
+    timeout.unref?.();
+  });
+  try {
+    const operationResult = Promise.resolve().then(() =>
+      operation(controller.signal)
+    );
+    return await Promise.race([operationResult, timeoutResult]);
+  } finally {
+    if (timeout !== undefined) {
+      globalThis.clearTimeout(timeout);
+    }
+  }
+}
+
 export async function fetchGatewayModels(): Promise<ChatModel[]> {
   if (!isGatewayConfigured()) {
     return [];
   }
 
   try {
-    const metadata = await gateway.getAvailableModels();
+    const metadata = await withCatalogTimeout(() =>
+      gateway.getAvailableModels()
+    );
     return (metadata.models ?? []).map((model) => ({
       id: model.id,
       name: model.name || model.id,
@@ -272,9 +299,12 @@ export async function fetchOpenCodeGoModels(): Promise<ChatModel[]> {
   }
 
   try {
-    const res = await fetch("https://opencode.ai/zen/go/v1/models", {
-      next: { revalidate: 86_400 },
-    });
+    const res = await withCatalogTimeout((signal) =>
+      fetch("https://opencode.ai/zen/go/v1/models", {
+        next: { revalidate: 86_400 },
+        signal,
+      })
+    );
     if (!res.ok) {
       return [];
     }
@@ -295,10 +325,13 @@ export async function fetchOpenAIModels(): Promise<ChatModel[]> {
     return [];
   }
   try {
-    const res = await fetch("https://api.openai.com/v1/models", {
-      headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
-      next: { revalidate: 86_400 },
-    });
+    const res = await withCatalogTimeout((signal) =>
+      fetch("https://api.openai.com/v1/models", {
+        headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+        next: { revalidate: 86_400 },
+        signal,
+      })
+    );
     if (!res.ok) {
       return [];
     }
@@ -334,9 +367,12 @@ async function fetchPublicOpenRouterModels({
   gatewayIds: boolean;
 }): Promise<ChatModel[]> {
   try {
-    const res = await fetch("https://openrouter.ai/api/v1/models", {
-      next: { revalidate: 86_400 },
-    });
+    const res = await withCatalogTimeout((signal) =>
+      fetch("https://openrouter.ai/api/v1/models", {
+        next: { revalidate: 86_400 },
+        signal,
+      })
+    );
     if (!res.ok) {
       return [];
     }
@@ -385,9 +421,12 @@ type OpenRouterRawModel = {
 
 async function fetchOpenRouterRawData(): Promise<OpenRouterRawModel[]> {
   try {
-    const res = await fetch("https://openrouter.ai/api/v1/models", {
-      next: { revalidate: 86_400 },
-    });
+    const res = await withCatalogTimeout((signal) =>
+      fetch("https://openrouter.ai/api/v1/models", {
+        next: { revalidate: 86_400 },
+        signal,
+      })
+    );
     if (!res.ok) {
       return [];
     }
