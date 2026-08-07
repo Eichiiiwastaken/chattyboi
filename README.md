@@ -107,3 +107,17 @@ To build the app image from your local checkout instead of pulling from GHCR:
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
 ```
+
+### Container security and uploads
+
+The app container runs its long-lived processes as UID/GID `10001`, with a
+read-only root filesystem, no-new-privileges, and only the capabilities needed
+to initialize the uploads volume and drop privileges. Runtime scratch data is
+kept in the Compose-managed `tmpfs` mounts for `/tmp` and
+`/app/.next/cache`; uploaded files are persisted in the `uploads` named volume.
+
+On startup, the entrypoint repairs ownership of an existing uploads volume when
+needed, then starts the migration and app processes as the unprivileged `app`
+user. The first start after upgrading an older root-running deployment may take
+longer while that one-time ownership migration runs. Keep `/app/uploads`
+writable and persistent if you customize the Compose configuration.

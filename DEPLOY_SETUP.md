@@ -1,5 +1,13 @@
 # Deployment Setup
 
+## Chat rate limits
+
+| Variable | Required | Description |
+|---|---|---|
+| `REDIS_URL` | For finite user quotas | Standalone Redis or a cluster-compatible proxy connection string, such as `redis://redis:6379`. Direct Redis Cluster endpoints are not supported. If a finite user quota is configured and Redis cannot enforce it, chat requests fail closed with `503 offline:chat`. |
+| `CHAT_MAX_MESSAGES_PER_HOUR` | No | Maximum model-generating chat requests per signed-in user in a one-hour window. Omit it or use a non-positive value for unlimited use. |
+| `IP_MAX_MESSAGES_PER_HOUR` | No | Best-effort production-only per-IP request limit. Requires `REDIS_URL`. |
+
 ## GitHub Container Registry (GHCR)
 
 Images are built by GitHub Actions on push to `main` and published to `ghcr.io/<owner>/chattyboi`.
@@ -32,6 +40,19 @@ Images are built by GitHub Actions on push to `main` and published to `ghcr.io/<
    docker compose up -d
    docker image prune -f
    ```
+
+### Container Runtime
+
+The supplied Compose service uses a read-only root filesystem and runs the
+application as UID/GID `10001`. It keeps only `/tmp` and `/app/.next/cache`
+writable as temporary filesystems, while `/app/uploads` remains backed by the
+persistent `uploads` volume.
+
+The image entrypoint may recursively repair the uploads volume ownership during
+the first start after upgrading from an older root-running image. It then drops
+privileges before migrations and the Next.js server start. Do not remove the
+`CHOWN`, `SETGID`, or `SETUID` capabilities unless the volume has already been
+prepared for UID/GID `10001` and the entrypoint is changed accordingly.
 
 ### Optional: Deploy Alias
 

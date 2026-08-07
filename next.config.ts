@@ -5,6 +5,9 @@ const basePath = process.env.IS_DEMO === "1" ? "/demo" : "";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  outputFileTracingIncludes: {
+    "/*": ["./node_modules/.pnpm/@img+sharp-*/node_modules/@img/sharp-*/**/*"],
+  },
   serverExternalPackages: [
     "@panva/hkdf",
     "jose",
@@ -26,6 +29,23 @@ const nextConfig: NextConfig = {
         ],
       }
     : {}),
+  headers: async () => [
+    {
+      source: "/:path*",
+      headers: [
+        { key: "X-Content-Type-Options", value: "nosniff" },
+        {
+          key: "Referrer-Policy",
+          value: "strict-origin-when-cross-origin",
+        },
+        { key: "X-Frame-Options", value: "DENY" },
+        {
+          key: "Permissions-Policy",
+          value: "camera=(), microphone=(), geolocation=()",
+        },
+      ],
+    },
+  ],
   env: {
     NEXT_PUBLIC_BASE_PATH: basePath,
   },
