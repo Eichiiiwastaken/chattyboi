@@ -283,9 +283,9 @@ export function ChatShell() {
                           setEditingMessage(null);
                           await submitEditedMessage({
                             message: msg,
+                            messages,
                             text: input,
                             attachments,
-                            skipPersistence: isOneTimeChat,
                             setMessages,
                             regenerate,
                           });

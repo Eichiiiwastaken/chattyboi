@@ -74,11 +74,15 @@ export async function PATCH(request: Request) {
     return new ChatbotError("forbidden:vote").toResponse();
   }
 
-  await voteMessage({
+  const savedVote = await voteMessage({
     chatId,
     messageId,
     type,
   });
+
+  if (!savedVote) {
+    return new ChatbotError("not_found:vote").toResponse();
+  }
 
   return new Response("Message voted", { status: 200 });
 }

@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { compare, hashSync } from "bcryptjs";
+import { hashSync } from "bcryptjs";
 import NextAuth, { type DefaultSession } from "next-auth";
 import type { DefaultJWT } from "next-auth/jwt";
 import Credentials from "next-auth/providers/credentials";
+import { verifyPassword } from "@/lib/auth/credentials";
 import type { AllowedUser } from "@/lib/auth/users";
-import { createUser, getUser } from "@/lib/db/queries";
+import { getOrCreateUser } from "@/lib/db/queries";
 import { authConfig } from "./auth.config";
 
 function getEnvUsers(): AllowedUser[] {
@@ -57,6 +58,8 @@ function getEnvUsers(): AllowedUser[] {
 
 const envUsers = getEnvUsers();
 
+const dummyPasswordHash = hashSync(randomUUID(), 10);
+
 function getAllowedUser(username: string) {
   return envUsers.find((u) => u.username === username);
 }
@@ -106,15 +109,12 @@ export const {
 
         const allowedUser = getAllowedUser(username);
 
-        if (!allowedUser) {
-          return null;
-        }
-
-        const passwordsMatch = await compare(
+        const passwordsMatch = await verifyPassword(
           password,
-          allowedUser.passwordHash
+          allowedUser,
+          dummyPasswordHash
         );
-        if (!passwordsMatch) {
+        if (!allowedUser || !passwordsMatch) {
           return null;
         }
 
@@ -143,14 +143,7 @@ export const {
 
       if (email) {
         try {
-          const dbUsers = await getUser(email);
-          let dbUser = dbUsers[0];
-
-          if (!dbUser) {
-            await createUser(email, randomUUID());
-            const fresh = await getUser(email);
-            dbUser = fresh[0];
-          }
+          const dbUser = await getOrCreateUser(email, randomUUID());
 
           if (dbUser) {
             token.id = dbUser.id;

@@ -260,6 +260,7 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
     ? "private"
     : (chatData?.visibility ?? "private");
   const manuallyStoppedChatIdsRef = useRef(new Map<string, number>());
+  const regenerationRollbackRef = useRef<ChatMessage[] | null>(null);
 
   const {
     messages,
@@ -323,7 +324,19 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
     onData: (dataPart) => {
       setDataStream((ds) => (ds ? [...ds, dataPart] : []));
     },
-    onFinish: () => {
+    onFinish: ({ isError }) => {
+      // The AI SDK invokes onFinish after onError for the same failed request.
+      // Failed regenerations are not persisted by the server. Restore the
+      // previous client snapshot so its message IDs still match storage.
+      if (isError) {
+        const rollbackMessages = regenerationRollbackRef.current;
+        regenerationRollbackRef.current = null;
+        if (rollbackMessages) {
+          setMessages(rollbackMessages);
+        }
+        return;
+      }
+      regenerationRollbackRef.current = null;
       clearGenerationError();
       if (!isOneTimeChat) {
         mutate(unstable_serialize(getChatHistoryPaginationKey));
@@ -370,6 +383,7 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
   >(
     (...args) => {
       manuallyStoppedChatIdsRef.current.delete(chatId);
+      regenerationRollbackRef.current = null;
       clearGenerationError();
       clearChatError();
       const sendPromise = sendMessage(...args);
@@ -390,6 +404,7 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
   >(
     (...args) => {
       manuallyStoppedChatIdsRef.current.delete(chatId);
+      regenerationRollbackRef.current = messages;
       clearGenerationError();
       clearChatError();
       const regeneratePromise = regenerate(...args);
@@ -400,6 +415,7 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
       clearChatError,
       clearGenerationError,
       chatId,
+      messages,
       regenerate,
       setGenerationErrorFromUnknown,
     ]
@@ -431,6 +447,7 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (prevChatIdRef.current !== chatId) {
       prevChatIdRef.current = chatId;
+      regenerationRollbackRef.current = null;
       if (isNewChat) {
         setMessages([]);
       }

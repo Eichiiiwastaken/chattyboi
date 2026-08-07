@@ -30,6 +30,7 @@ import { SparklesIcon } from "./icons";
 import { MessageActions } from "./message-actions";
 import { MessageReasoning } from "./message-reasoning";
 import { PreviewAttachment } from "./preview-attachment";
+import { ToolApprovalButtons } from "./tool-approval-buttons";
 import { Weather } from "./weather";
 
 type QuoteSelectionState = {
@@ -852,6 +853,24 @@ const PurePreviewMessage = ({
       const widthClass = "w-[min(100%,450px)]";
 
       if (state === "output-available") {
+        if (
+          part.output &&
+          typeof part.output === "object" &&
+          "error" in part.output
+        ) {
+          return (
+            <div className={widthClass} key={toolCallId}>
+              <Tool className="w-full" defaultOpen={true}>
+                <ToolHeader state={state} type="tool-getWeather" />
+                <ToolContent>
+                  <div className="px-4 py-3 text-muted-foreground text-sm">
+                    {part.output.error}
+                  </div>
+                </ToolContent>
+              </Tool>
+            </div>
+          );
+        }
         return (
           <div className={widthClass} key={toolCallId}>
             <Weather weatherAtLocation={part.output} />
@@ -897,33 +916,22 @@ const PurePreviewMessage = ({
                 <ToolInput input={part.input} />
               )}
               {state === "approval-requested" && approvalId && (
-                <div className="flex items-center justify-end gap-2 border-t px-4 py-3">
-                  <button
-                    className="rounded-md px-3 py-1.5 text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground"
-                    onClick={() => {
-                      addToolApprovalResponse({
-                        id: approvalId,
-                        approved: false,
-                        reason: "User denied weather lookup",
-                      });
-                    }}
-                    type="button"
-                  >
-                    Deny
-                  </button>
-                  <button
-                    className="rounded-md bg-primary px-3 py-1.5 text-primary-foreground text-sm transition-colors hover:bg-primary/90"
-                    onClick={() => {
-                      addToolApprovalResponse({
-                        id: approvalId,
-                        approved: true,
-                      });
-                    }}
-                    type="button"
-                  >
-                    Allow
-                  </button>
-                </div>
+                <ToolApprovalButtons
+                  disabled={isLoading}
+                  onApprove={() => {
+                    addToolApprovalResponse({
+                      id: approvalId,
+                      approved: true,
+                    });
+                  }}
+                  onDeny={() => {
+                    addToolApprovalResponse({
+                      id: approvalId,
+                      approved: false,
+                      reason: "User denied weather lookup",
+                    });
+                  }}
+                />
               )}
             </ToolContent>
           </Tool>

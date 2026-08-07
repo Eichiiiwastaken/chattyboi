@@ -18,6 +18,7 @@ import {
   MAX_CONTEXT_MESSAGES,
   selectRecentChatMessages,
 } from "@/lib/ai/chat-context";
+import { shouldPersistChatStream } from "@/lib/ai/chat-persistence";
 import { entitlementsByUserType } from "@/lib/ai/entitlements";
 import {
   DEFAULT_CHAT_MODEL,
@@ -36,19 +37,26 @@ import {
   MAX_SEARCH_ANSWER_TOKENS,
   withSearchAnswerFallback,
 } from "@/lib/ai/search-answer-fallback";
+import {
+  buildUiMessagesWithClaims,
+  extractApprovalDeltas,
+  mergeClaimedApprovalParts,
+} from "@/lib/ai/tool-approval";
 import { webSearch } from "@/lib/ai/tools/web-search";
 import { getWebSearchStepSettings } from "@/lib/ai/web-search-step";
 
 import { isProductionEnvironment } from "@/lib/constants";
 import {
+  claimToolApprovals,
   createStreamId,
   deleteChatById,
-  deleteMessagesByChatIdAfterTimestamp,
+  deleteStreamId,
+  deleteSuffixAndSaveMessages,
   getChatById,
   getMessageById,
-  getMessageCountByUserId,
+  getOrCreateChat,
   getRecentMessagesByChatId,
-  saveChat,
+  pruneExpiredStreamIdsByChatId,
   saveMessages,
   updateChatLastModelById,
   updateChatTitleById,
@@ -56,9 +64,16 @@ import {
 } from "@/lib/db/queries";
 import type { DBMessage } from "@/lib/db/schema";
 import { ChatbotError, getErrorMessageFromUnknown } from "@/lib/errors";
-import { checkIpRateLimit } from "@/lib/ratelimit";
+import {
+  RequestBodyTooLargeError,
+  readJsonWithLimit,
+} from "@/lib/http/request-json";
+import { checkIpRateLimit, enforceUserChatQuota } from "@/lib/ratelimit";
 import { publishChatEvent } from "@/lib/realtime/events";
-import { getResumableStreamContext } from "@/lib/streams/resumable";
+import {
+  registerResumableStream,
+  STREAM_ID_RETENTION_MS,
+} from "@/lib/streams/resumable";
 import type { ChatMessage } from "@/lib/types";
 import {
   getUploadPath,
@@ -74,6 +89,7 @@ import { generateTitleFromUserMessage } from "../../actions";
 import { type PostRequestBody, postRequestBodySchema } from "./schema";
 
 export const maxDuration = 300;
+const MAX_CHAT_REQUEST_BODY_BYTES = 1024 * 1024;
 
 function searchResultCount(output: unknown) {
   if (
@@ -147,9 +163,21 @@ export async function POST(request: Request) {
   let requestBody: PostRequestBody;
 
   try {
-    const json = await request.json();
+    const json = await readJsonWithLimit({
+      maxBytes: MAX_CHAT_REQUEST_BODY_BYTES,
+      request,
+    });
     requestBody = postRequestBodySchema.parse(json);
-  } catch (_) {
+  } catch (error) {
+    if (error instanceof RequestBodyTooLargeError) {
+      return Response.json(
+        {
+          code: "bad_request:api",
+          message: "Request body is too large.",
+        },
+        { status: 413 }
+      );
+    }
     return new ChatbotError("bad_request:api").toResponse();
   }
 
@@ -192,25 +220,15 @@ export async function POST(request: Request) {
 
     await checkIpRateLimit(ipAddress(request));
 
-    const userType: UserType = session.user.type;
-
-    const messageCount = await getMessageCountByUserId({
-      id: session.user.id,
-      differenceInHours: 1,
-    });
-
-    if (messageCount > entitlementsByUserType[userType].maxMessagesPerHour) {
-      return new ChatbotError("rate_limit:chat").toResponse();
-    }
-
     const isRegenerate = trigger === "regenerate-message";
     const isToolApprovalFlow =
       Boolean(messages) && !isOneTimeChat && !isRegenerate;
 
-    const chat = isOneTimeChat ? null : await getChatById({ id });
+    let chat = isOneTimeChat ? null : await getChatById({ id });
     let messagesFromDb: DBMessage[] = [];
     let historyWasTruncated = false;
     let regeneratedUserMessage: ChatMessage | null = null;
+    let messageToRegenerate: DBMessage | null = null;
     let titlePromise: Promise<string | null> | null = null;
     let shouldGenerateTitle = false;
 
@@ -219,7 +237,10 @@ export async function POST(request: Request) {
         return new ChatbotError("forbidden:chat").toResponse();
       }
       if (isRegenerate && messageId) {
-        const [messageToRegenerate] = await getMessageById({ id: messageId });
+        const [storedMessageToRegenerate] = await getMessageById({
+          id: messageId,
+        });
+        messageToRegenerate = storedMessageToRegenerate ?? null;
 
         if (
           !messageToRegenerate &&
@@ -228,15 +249,8 @@ export async function POST(request: Request) {
           return new ChatbotError("bad_request:api").toResponse();
         }
 
-        if (messageToRegenerate) {
-          if (messageToRegenerate.chatId !== id) {
-            return new ChatbotError("bad_request:api").toResponse();
-          }
-
-          await deleteMessagesByChatIdAfterTimestamp({
-            chatId: id,
-            timestamp: messageToRegenerate.createdAt,
-          });
+        if (messageToRegenerate && messageToRegenerate.chatId !== id) {
+          return new ChatbotError("bad_request:api").toResponse();
         }
 
         if (messageToRegenerate?.role === "user" || !messageToRegenerate) {
@@ -256,27 +270,54 @@ export async function POST(request: Request) {
       const recentMessages = await getRecentMessagesByChatId({
         id,
         limit: MAX_CONTEXT_MESSAGES,
+        beforeMessageId: messageToRegenerate?.id,
       });
       messagesFromDb = recentMessages.messages;
       historyWasTruncated = recentMessages.hasMore;
-    } else if (!isOneTimeChat && message?.role === "user") {
-      await saveChat({
+    } else if (!isOneTimeChat && message?.role !== "user") {
+      return new ChatbotError("bad_request:api").toResponse();
+    }
+
+    if (missingProviderConfig) {
+      return new ChatbotError(
+        "bad_request:chat",
+        `${missingProviderConfig.providerName} is missing ${missingProviderConfig.envVar}.`
+      ).toResponse();
+    }
+
+    const userType: UserType = session.user.type;
+    await enforceUserChatQuota({
+      userId: session.user.id,
+      limit: entitlementsByUserType[userType].maxMessagesPerHour,
+    });
+
+    if (!chat && !isOneTimeChat && message?.role === "user") {
+      const { chat: createdChat, created } = await getOrCreateChat({
         id,
         userId: session.user.id,
         title: "New chat",
         visibility: selectedVisibilityType,
         lastModelId: chatModel,
       });
-      await publishChatEvent({
-        userId: session.user.id,
-        event: {
-          type: "chat.created",
-          chatId: id,
-          title: "New chat",
-          createdAt: new Date().toISOString(),
-        },
-      });
-      shouldGenerateTitle = true;
+
+      if (createdChat.userId !== session.user.id) {
+        return new ChatbotError("forbidden:chat").toResponse();
+      }
+
+      chat = createdChat;
+
+      if (created) {
+        await publishChatEvent({
+          userId: session.user.id,
+          event: {
+            type: "chat.created",
+            chatId: id,
+            title: "New chat",
+            createdAt: new Date().toISOString(),
+          },
+        });
+        shouldGenerateTitle = true;
+      }
     }
 
     if (chat && !isOneTimeChat && chat.lastModelId !== chatModel) {
@@ -284,6 +325,7 @@ export async function POST(request: Request) {
     }
 
     let uiMessages: ChatMessage[];
+    let claimedApprovalMessage: DBMessage | null = null;
 
     const regenerateUserMessage =
       regeneratedUserMessage ??
@@ -297,34 +339,32 @@ export async function POST(request: Request) {
         ...(regenerateUserMessage ? [regenerateUserMessage] : []),
       ];
     } else if (isToolApprovalFlow && messages) {
-      const dbMessages = convertToUIMessages(messagesFromDb);
-      const approvalStates = new Map(
-        messages.flatMap(
-          (m) =>
-            m.parts
-              ?.filter(
-                (p: Record<string, unknown>) =>
-                  p.state === "approval-responded" ||
-                  p.state === "output-denied"
-              )
-              .map((p: Record<string, unknown>) => [
-                String(p.toolCallId ?? ""),
-                p,
-              ]) ?? []
-        )
-      );
-      uiMessages = dbMessages.map((msg) => ({
-        ...msg,
-        parts: msg.parts.map((part) => {
-          if (
-            "toolCallId" in part &&
-            approvalStates.has(String(part.toolCallId))
-          ) {
-            return { ...part, ...approvalStates.get(String(part.toolCallId)) };
-          }
-          return part;
-        }),
-      })) as ChatMessage[];
+      const deltas = extractApprovalDeltas(messages);
+      if (!deltas?.length) {
+        return new ChatbotError(
+          "bad_request:api",
+          "Approval already processed or invalid."
+        ).toResponse();
+      }
+
+      claimedApprovalMessage = await claimToolApprovals({
+        messageId: deltas[0].messageId,
+        chatId: id,
+        userId: session.user.id,
+        deltas,
+      });
+
+      if (!claimedApprovalMessage) {
+        return new ChatbotError(
+          "bad_request:api",
+          "Approval already processed or invalid."
+        ).toResponse();
+      }
+
+      uiMessages = buildUiMessagesWithClaims({
+        messagesFromDb,
+        claimedMessages: [claimedApprovalMessage],
+      });
     } else {
       uiMessages = [
         ...convertToUIMessages(messagesFromDb),
@@ -348,7 +388,7 @@ export async function POST(request: Request) {
         ? message
         : regeneratedUserMessage;
 
-    if (userMessageToSave) {
+    if (userMessageToSave && !messageToRegenerate) {
       const createdAt = new Date();
       await saveMessages({
         messages: [
@@ -378,42 +418,6 @@ export async function POST(request: Request) {
         modelId: chatModel,
         userId: session.user.id,
       };
-    }
-
-    if (missingProviderConfig) {
-      const providerConfigError = new ChatbotError(
-        "bad_request:chat",
-        `${missingProviderConfig.providerName} is missing ${missingProviderConfig.envVar}.`
-      );
-      const normalizedError = getErrorMessageFromUnknown(providerConfigError);
-      const errorText = normalizedError.detail
-        ? `${normalizedError.message}\n${normalizedError.detail}`
-        : normalizedError.message;
-
-      if (!isOneTimeChat) {
-        if (shouldGenerateTitle && message?.role === "user") {
-          const title = getFallbackTitleFromMessage(message);
-          await updateChatTitleById({ chatId: id, title });
-          await publishChatEvent({
-            userId: session.user.id,
-            event: {
-              type: "chat.title.updated",
-              chatId: id,
-              title,
-            },
-          });
-        }
-
-        await saveAssistantErrorMessage({
-          chatId: id,
-          errorText,
-          modelId: chatModel,
-          modelName: chatModel,
-          userId: session.user.id,
-        });
-      }
-
-      return providerConfigError.toResponse();
     }
 
     const models = await getAllModels();
@@ -683,7 +687,13 @@ export async function POST(request: Request) {
       },
       generateId: generateUUID,
       onFinish: async ({ messages: finishedMessages, responseMessage }) => {
-        if (isOneTimeChat) {
+        if (
+          !shouldPersistChatStream({
+            hasStoredRegenerationTarget: messageToRegenerate !== null,
+            isOneTimeChat: isOneTimeChat === true,
+            streamFailed: streamErrorText !== null,
+          })
+        ) {
           return;
         }
 
@@ -709,11 +719,28 @@ export async function POST(request: Request) {
 
         if (isToolApprovalFlow) {
           for (const finishedMsg of messagesToPersist) {
-            const existingMsg = uiMessages.find((m) => m.id === finishedMsg.id);
-            if (existingMsg) {
+            const existingMessage = uiMessages.find(
+              (currentMessage) => currentMessage.id === finishedMsg.id
+            );
+
+            if (existingMessage) {
+              const parts =
+                claimedApprovalMessage?.id === finishedMsg.id
+                  ? mergeClaimedApprovalParts({
+                      finishedParts: finishedMsg.parts as Record<
+                        string,
+                        unknown
+                      >[],
+                      claimedParts: claimedApprovalMessage.parts as Record<
+                        string,
+                        unknown
+                      >[],
+                    })
+                  : finishedMsg.parts;
+
               await updateMessage({
                 id: finishedMsg.id,
-                parts: finishedMsg.parts,
+                parts: parts as DBMessage["parts"],
                 metadata: finishedMsg.metadata as DBMessage["metadata"],
               });
             } else {
@@ -733,30 +760,87 @@ export async function POST(request: Request) {
             }
           }
         } else if (messagesToPersist.length > 0) {
-          const createdAt = new Date();
-          await saveMessages({
-            messages: messagesToPersist.map((currentMessage) => ({
-              id: currentMessage.id,
-              role: currentMessage.role,
-              parts: currentMessage.parts,
-              createdAt,
-              attachments: [],
+          if (messageToRegenerate) {
+            const dbMessages: {
+              id: string;
+              chatId: string;
+              role: string;
+              parts: DBMessage["parts"];
+              attachments: unknown[];
+              createdAt: Date;
+              metadata: DBMessage["metadata"];
+            }[] = [];
+
+            if (regeneratedUserMessage) {
+              dbMessages.push({
+                id: regeneratedUserMessage.id,
+                role: "user",
+                parts: regeneratedUserMessage.parts as DBMessage["parts"],
+                createdAt: messageToRegenerate.createdAt,
+                attachments: [],
+                chatId: id,
+                metadata: null,
+              });
+            }
+
+            const responseCreatedAt = new Date();
+            for (const finishedMessage of messagesToPersist) {
+              dbMessages.push({
+                id: finishedMessage.id,
+                role: finishedMessage.role,
+                parts: finishedMessage.parts as DBMessage["parts"],
+                createdAt: responseCreatedAt,
+                attachments: [],
+                chatId: id,
+                metadata: finishedMessage.metadata as DBMessage["metadata"],
+              });
+            }
+
+            await deleteSuffixAndSaveMessages({
               chatId: id,
-              metadata: currentMessage.metadata as DBMessage["metadata"],
-            })),
-          });
-          for (const finishedMessage of messagesToPersist) {
-            if (finishedMessage.role !== "user") {
+              timestamp: messageToRegenerate.createdAt,
+              messageId: messageToRegenerate.id,
+              messages: dbMessages,
+            });
+
+            for (const msg of dbMessages) {
               await publishChatEvent({
                 userId: session.user.id,
                 event: {
                   type: "message.created",
                   chatId: id,
-                  messageId: finishedMessage.id,
-                  role: finishedMessage.role,
-                  createdAt: createdAt.toISOString(),
+                  messageId: msg.id,
+                  role: msg.role,
+                  createdAt: msg.createdAt.toISOString(),
                 },
               });
+            }
+          } else {
+            const createdAt = new Date();
+            await saveMessages({
+              messages: messagesToPersist.map((currentMessage) => ({
+                id: currentMessage.id,
+                role: currentMessage.role,
+                parts: currentMessage.parts,
+                createdAt,
+                attachments: [],
+                chatId: id,
+                metadata: currentMessage.metadata as DBMessage["metadata"],
+              })),
+            });
+            for (const finishedMessage of messagesToPersist) {
+              if (finishedMessage.role !== "user") {
+                await publishChatEvent({
+                  userId: session.user.id,
+                  event: {
+                    type: "message.created",
+                    chatId: id,
+                    messageId: finishedMessage.id,
+                    role: finishedMessage.role,
+                    createdAt: createdAt.toISOString(),
+                  },
+                });
+              }
             }
           }
         }
@@ -791,23 +875,25 @@ export async function POST(request: Request) {
           return;
         }
         try {
-          const streamContext = getResumableStreamContext();
-          if (streamContext) {
-            const streamId = generateUUID();
-            await createStreamId({ streamId, chatId: id });
-            await publishChatEvent({
-              userId: session.user.id,
-              event: {
-                type: "chat.stream.created",
+          const streamId = generateUUID();
+          await registerResumableStream(streamId, () => sseStream, {
+            createStreamId: () => createStreamId({ streamId, chatId: id }),
+            deleteStreamId: () => deleteStreamId({ streamId, chatId: id }),
+            pruneExpiredStreamIds: () =>
+              pruneExpiredStreamIdsByChatId({
                 chatId: id,
-                streamId,
-              },
-            });
-            await streamContext.createNewResumableStream(
-              streamId,
-              () => sseStream
-            );
-          }
+                before: new Date(Date.now() - STREAM_ID_RETENTION_MS),
+              }),
+            publishStreamCreated: () =>
+              publishChatEvent({
+                userId: session.user.id,
+                event: {
+                  type: "chat.stream.created",
+                  chatId: id,
+                  streamId,
+                },
+              }),
+          });
         } catch (_) {
           /* non-critical */
         }

@@ -18,8 +18,13 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import type { ArtifactKind } from "@/components/chat/artifact";
 import type { VisibilityType } from "@/components/chat/visibility-selector";
+import {
+  type ApprovalDelta,
+  tryApplyApprovalDeltas,
+} from "../ai/tool-approval";
 import { ChatbotError } from "../errors";
 import { generateUUID } from "../utils";
+import { getChatCursorCondition } from "./chat-pagination";
 import {
   type Chat,
   chat,
@@ -61,8 +66,6 @@ export async function createUser(email: string, password: string) {
 }
 
 export async function getOrCreateUser(email: string, password: string) {
-  const hashedPassword = generateHashedPassword(password);
-
   try {
     return await db.transaction(async (tx) => {
       await tx.execute(
@@ -77,6 +80,7 @@ export async function getOrCreateUser(email: string, password: string) {
         return existing[0];
       }
 
+      const hashedPassword = generateHashedPassword(password);
       const [created] = await tx
         .insert(user)
         .values({ email, password: hashedPassword })
@@ -112,7 +116,69 @@ export async function createGuestUser() {
   }
 }
 
-export async function saveChat({
+export async function executeGetOrCreateChat(
+  tx: {
+    execute: (query: SQL<unknown>) => Promise<unknown>;
+    select: () => {
+      from: (table: typeof chat) => {
+        where: (condition: SQL<unknown>) => Promise<Chat[]>;
+      };
+    };
+    insert: (table: typeof chat) => {
+      values: (data: {
+        id: string;
+        createdAt: Date;
+        userId: string;
+        title: string;
+        visibility: "public" | "private";
+        lastModelId: string | null;
+      }) => { returning: () => Promise<Chat[]> };
+    };
+  },
+  {
+    id,
+    userId,
+    title,
+    visibility,
+    lastModelId,
+  }: {
+    id: string;
+    userId: string;
+    title: string;
+    visibility: VisibilityType;
+    lastModelId?: string | null;
+  }
+): Promise<{ chat: Chat; created: boolean }> {
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(hashtextextended(${id}, 0))`
+  );
+
+  const existing = await tx.select().from(chat).where(eq(chat.id, id));
+
+  if (existing.length > 0) {
+    return { chat: existing[0], created: false };
+  }
+
+  const [created] = await tx
+    .insert(chat)
+    .values({
+      id,
+      createdAt: new Date(),
+      userId,
+      title,
+      visibility,
+      lastModelId: lastModelId ?? null,
+    })
+    .returning();
+
+  if (!created) {
+    throw new Error("Failed to create chat");
+  }
+
+  return { chat: created, created: true };
+}
+
+export async function getOrCreateChat({
   id,
   userId,
   title,
@@ -124,18 +190,25 @@ export async function saveChat({
   title: string;
   visibility: VisibilityType;
   lastModelId?: string | null;
-}) {
+}): Promise<{ chat: Chat; created: boolean }> {
   try {
-    return await db.insert(chat).values({
-      id,
-      createdAt: new Date(),
-      userId,
-      title,
-      visibility,
-      lastModelId: lastModelId ?? null,
-    });
+    return await db.transaction(async (tx) =>
+      executeGetOrCreateChat(tx, {
+        id,
+        userId,
+        title,
+        visibility,
+        lastModelId,
+      })
+    );
   } catch (_error) {
-    throw new ChatbotError("bad_request:database", "Failed to save chat");
+    if (_error instanceof ChatbotError) {
+      throw _error;
+    }
+    throw new ChatbotError(
+      "bad_request:database",
+      "Failed to get or create chat"
+    );
   }
 }
 
@@ -184,15 +257,17 @@ export async function saveChatWithMessages({
 
 export async function deleteChatById({ id }: { id: string }) {
   try {
-    await db.delete(vote).where(eq(vote.chatId, id));
-    await db.delete(message).where(eq(message.chatId, id));
-    await db.delete(stream).where(eq(stream.chatId, id));
+    return await db.transaction(async (tx) => {
+      await tx.delete(vote).where(eq(vote.chatId, id));
+      await tx.delete(message).where(eq(message.chatId, id));
+      await tx.delete(stream).where(eq(stream.chatId, id));
 
-    const [chatsDeleted] = await db
-      .delete(chat)
-      .where(eq(chat.id, id))
-      .returning();
-    return chatsDeleted;
+      const [chatsDeleted] = await tx
+        .delete(chat)
+        .where(eq(chat.id, id))
+        .returning();
+      return chatsDeleted;
+    });
   } catch (_error) {
     throw new ChatbotError(
       "bad_request:database",
@@ -214,16 +289,18 @@ export async function deleteAllChatsByUserId({ userId }: { userId: string }) {
 
     const chatIds = userChats.map((c) => c.id);
 
-    await db.delete(vote).where(inArray(vote.chatId, chatIds));
-    await db.delete(message).where(inArray(message.chatId, chatIds));
-    await db.delete(stream).where(inArray(stream.chatId, chatIds));
+    return await db.transaction(async (tx) => {
+      await tx.delete(vote).where(inArray(vote.chatId, chatIds));
+      await tx.delete(message).where(inArray(message.chatId, chatIds));
+      await tx.delete(stream).where(inArray(stream.chatId, chatIds));
 
-    const deletedChats = await db
-      .delete(chat)
-      .where(eq(chat.userId, userId))
-      .returning();
+      const deletedChats = await tx
+        .delete(chat)
+        .where(inArray(chat.id, chatIds))
+        .returning();
 
-    return { deletedCount: deletedChats.length };
+      return { deletedCount: deletedChats.length };
+    });
   } catch (_error) {
     throw new ChatbotError(
       "bad_request:database",
@@ -255,7 +332,7 @@ export async function getChatsByUserId({
             ? and(whereCondition, eq(chat.userId, id))
             : eq(chat.userId, id)
         )
-        .orderBy(desc(chat.createdAt))
+        .orderBy(desc(chat.createdAt), desc(chat.id))
         .limit(extendedLimit);
 
     let filteredChats: Chat[] = [];
@@ -274,7 +351,9 @@ export async function getChatsByUserId({
         );
       }
 
-      filteredChats = await query(gt(chat.createdAt, selectedChat.createdAt));
+      filteredChats = await query(
+        getChatCursorCondition(selectedChat, "startingAfter")
+      );
     } else if (endingBefore) {
       const [selectedChat] = await db
         .select()
@@ -289,7 +368,9 @@ export async function getChatsByUserId({
         );
       }
 
-      filteredChats = await query(lt(chat.createdAt, selectedChat.createdAt));
+      filteredChats = await query(
+        getChatCursorCondition(selectedChat, "endingBefore")
+      );
     } else {
       filteredChats = await query();
     }
@@ -348,13 +429,94 @@ export async function updateMessage({
   }
 }
 
+export async function claimToolApprovals({
+  messageId,
+  chatId,
+  userId,
+  deltas,
+}: {
+  messageId: string;
+  chatId: string;
+  userId: string;
+  deltas: ApprovalDelta[];
+}) {
+  try {
+    return await db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${messageId}, 0))`
+      );
+
+      if (
+        deltas.length === 0 ||
+        deltas.some((delta) => delta.messageId !== messageId)
+      ) {
+        return null;
+      }
+
+      const [chatRow] = await tx
+        .select({ userId: chat.userId })
+        .from(chat)
+        .where(eq(chat.id, chatId));
+
+      if (!chatRow || chatRow.userId !== userId) {
+        return null;
+      }
+
+      const [latestMessage] = await tx
+        .select({ id: message.id })
+        .from(message)
+        .where(eq(message.chatId, chatId))
+        .orderBy(desc(message.createdAt), desc(message.id))
+        .limit(1);
+
+      if (latestMessage?.id !== messageId) {
+        return null;
+      }
+
+      const [storedMessage] = await tx
+        .select()
+        .from(message)
+        .where(and(eq(message.id, messageId), eq(message.chatId, chatId)));
+
+      if (storedMessage?.role !== "assistant") {
+        return null;
+      }
+
+      const updatedParts = tryApplyApprovalDeltas({
+        parts: storedMessage.parts as Record<string, unknown>[],
+        deltas,
+      });
+
+      if (!updatedParts) {
+        return null;
+      }
+
+      const [updated] = await tx
+        .update(message)
+        .set({ parts: updatedParts as DBMessage["parts"] })
+        .where(and(eq(message.id, messageId), eq(message.chatId, chatId)))
+        .returning();
+
+      return updated ?? null;
+    });
+  } catch (_error) {
+    if (_error instanceof ChatbotError) {
+      throw _error;
+    }
+    throw new ChatbotError(
+      "bad_request:database",
+      "Failed to claim tool approval"
+    );
+  }
+}
+
 export async function getMessagesByChatId({ id }: { id: string }) {
   try {
     return await db
       .select()
       .from(message)
       .where(eq(message.chatId, id))
-      .orderBy(asc(message.createdAt));
+      .orderBy(asc(message.createdAt), asc(message.id));
   } catch (_error) {
     throw new ChatbotError(
       "bad_request:database",
@@ -366,11 +528,13 @@ export async function getMessagesByChatId({ id }: { id: string }) {
 export function getRecentMessagesByChatId({
   id,
   limit,
+  beforeMessageId,
 }: {
   id: string;
   limit: number;
+  beforeMessageId?: string;
 }) {
-  return getMessagePageByChatId({ id, limit });
+  return getMessagePageByChatId({ id, limit, beforeMessageId });
 }
 
 export async function getMessagePageByChatId({
@@ -405,11 +569,7 @@ export async function getMessagePageByChatId({
     const rows = await db
       .select()
       .from(message)
-      .where(
-        beforeCondition
-          ? and(eq(message.chatId, id), beforeCondition)
-          : eq(message.chatId, id)
-      )
+      .where(and(eq(message.chatId, id), beforeCondition))
       .orderBy(desc(message.createdAt), desc(message.id))
       .limit(limit + 1);
     const hasMore = rows.length > limit;
@@ -448,7 +608,7 @@ export async function getUsageMessagesByUserId({
           ...(startDate ? [gte(message.createdAt, startDate)] : [])
         )
       )
-      .orderBy(asc(message.createdAt));
+      .orderBy(asc(message.createdAt), asc(message.id));
   } catch (_error) {
     throw new ChatbotError(
       "bad_request:database",
@@ -467,21 +627,30 @@ export async function voteMessage({
   type: "up" | "down";
 }) {
   try {
-    const [existingVote] = await db
-      .select()
-      .from(vote)
-      .where(and(eq(vote.messageId, messageId)));
+    return await db.transaction(async (tx) => {
+      const [targetMessage] = await tx
+        .select({ id: message.id })
+        .from(message)
+        .where(and(eq(message.id, messageId), eq(message.chatId, chatId)));
 
-    if (existingVote) {
-      return await db
-        .update(vote)
-        .set({ isUpvoted: type === "up" })
-        .where(and(eq(vote.messageId, messageId), eq(vote.chatId, chatId)));
-    }
-    return await db.insert(vote).values({
-      chatId,
-      messageId,
-      isUpvoted: type === "up",
+      if (!targetMessage) {
+        return null;
+      }
+
+      const [savedVote] = await tx
+        .insert(vote)
+        .values({
+          chatId,
+          messageId,
+          isUpvoted: type === "up",
+        })
+        .onConflictDoUpdate({
+          target: [vote.chatId, vote.messageId],
+          set: { isUpvoted: type === "up" },
+        })
+        .returning();
+
+      return savedVote ?? null;
     });
   } catch (_error) {
     throw new ChatbotError("bad_request:database", "Failed to vote message");
@@ -672,19 +841,27 @@ export async function getMessageById({ id }: { id: string }) {
   }
 }
 
-export async function deleteMessagesByChatIdAfterTimestamp({
+export async function deleteMessagesByChatIdFromMessage({
   chatId,
   timestamp,
+  messageId,
 }: {
   chatId: string;
   timestamp: Date;
+  messageId: string;
 }) {
   try {
     const messagesToDelete = await db
       .select({ id: message.id })
       .from(message)
       .where(
-        and(eq(message.chatId, chatId), gte(message.createdAt, timestamp))
+        and(
+          eq(message.chatId, chatId),
+          or(
+            gt(message.createdAt, timestamp),
+            and(eq(message.createdAt, timestamp), gte(message.id, messageId))
+          )
+        )
       );
 
     const messageIds = messagesToDelete.map(
@@ -707,7 +884,67 @@ export async function deleteMessagesByChatIdAfterTimestamp({
   } catch (_error) {
     throw new ChatbotError(
       "bad_request:database",
-      "Failed to delete messages by chat id after timestamp"
+      "Failed to delete messages by chat id from cursor"
+    );
+  }
+}
+
+export async function deleteSuffixAndSaveMessages({
+  chatId,
+  timestamp,
+  messageId,
+  messages,
+}: {
+  chatId: string;
+  timestamp: Date;
+  messageId: string;
+  messages: DBMessage[];
+}) {
+  try {
+    return await db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${chatId}, 0))`
+      );
+
+      const messagesToDelete = await tx
+        .select({ id: message.id })
+        .from(message)
+        .where(
+          and(
+            eq(message.chatId, chatId),
+            or(
+              gt(message.createdAt, timestamp),
+              and(eq(message.createdAt, timestamp), gte(message.id, messageId))
+            )
+          )
+        );
+
+      const messageIds = messagesToDelete.map(
+        (currentMessage) => currentMessage.id
+      );
+
+      if (messageIds.length > 0) {
+        await tx
+          .delete(vote)
+          .where(
+            and(eq(vote.chatId, chatId), inArray(vote.messageId, messageIds))
+          );
+
+        await tx
+          .delete(message)
+          .where(
+            and(eq(message.chatId, chatId), inArray(message.id, messageIds))
+          );
+      }
+
+      if (messages.length > 0) {
+        await tx.insert(message).values(messages);
+      }
+    });
+  } catch (_error) {
+    throw new ChatbotError(
+      "bad_request:database",
+      "Failed to delete suffix and save messages"
     );
   }
 }
@@ -847,6 +1084,69 @@ export async function getStreamIdsByChatId({ chatId }: { chatId: string }) {
     throw new ChatbotError(
       "bad_request:database",
       "Failed to get stream ids by chat id"
+    );
+  }
+}
+
+export async function getRecentStreamIdsByChatId({
+  chatId,
+  limit = 20,
+}: {
+  chatId: string;
+  limit?: number;
+}) {
+  try {
+    const streamIds = await db
+      .select({ id: stream.id })
+      .from(stream)
+      .where(eq(stream.chatId, chatId))
+      .orderBy(desc(stream.createdAt))
+      .limit(limit)
+      .execute();
+
+    return streamIds.map(({ id }) => id);
+  } catch (_error) {
+    throw new ChatbotError(
+      "bad_request:database",
+      "Failed to get recent stream ids by chat id"
+    );
+  }
+}
+
+export async function deleteStreamId({
+  streamId,
+  chatId,
+}: {
+  streamId: string;
+  chatId: string;
+}) {
+  try {
+    await db
+      .delete(stream)
+      .where(and(eq(stream.id, streamId), eq(stream.chatId, chatId)));
+  } catch (_error) {
+    throw new ChatbotError(
+      "bad_request:database",
+      "Failed to delete stream id"
+    );
+  }
+}
+
+export async function pruneExpiredStreamIdsByChatId({
+  chatId,
+  before,
+}: {
+  chatId: string;
+  before: Date;
+}) {
+  try {
+    await db
+      .delete(stream)
+      .where(and(eq(stream.chatId, chatId), lt(stream.createdAt, before)));
+  } catch (_error) {
+    throw new ChatbotError(
+      "bad_request:database",
+      "Failed to prune expired stream ids"
     );
   }
 }

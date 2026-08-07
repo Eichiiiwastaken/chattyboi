@@ -42,6 +42,7 @@ import {
   titleModel,
 } from "@/lib/ai/models";
 import type { ReasoningEffort } from "@/lib/ai/reasoning";
+import { markdownFromClipboard } from "@/lib/markdown/clipboard";
 import type { Attachment, ChatMessage } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import {
@@ -451,8 +452,40 @@ function PureMultimodalInput({
       const fileItems = Array.from(items).filter(
         (item) => item.kind === "file" && item.type.startsWith("image/")
       );
+      const files = fileItems
+        .map((item) => item.getAsFile())
+        .filter((file): file is File => file !== null);
+      const plainText = event.clipboardData.getData("text/plain");
+      const pastedText = markdownFromClipboard(
+        event.clipboardData.getData("text/html"),
+        plainText
+      );
+      const shouldReplaceText = pastedText !== plainText;
+      const shouldHandleFiles = files.length > 0;
 
-      if (fileItems.length === 0) {
+      if (!shouldReplaceText && !shouldHandleFiles) {
+        return;
+      }
+
+      event.preventDefault();
+
+      if (pastedText) {
+        const textarea = event.currentTarget;
+        const selectionStart = textarea.selectionStart;
+        const selectionEnd = textarea.selectionEnd;
+        const nextValue =
+          input.slice(0, selectionStart) +
+          pastedText +
+          input.slice(selectionEnd);
+        const nextCaretPosition = selectionStart + pastedText.length;
+
+        setInput(nextValue);
+        window.requestAnimationFrame(() => {
+          textarea.setSelectionRange(nextCaretPosition, nextCaretPosition);
+        });
+      }
+
+      if (!shouldHandleFiles) {
         return;
       }
 
@@ -461,19 +494,13 @@ function PureMultimodalInput({
         return;
       }
 
-      event.preventDefault();
-
-      const files = fileItems
-        .map((item) => item.getAsFile())
-        .filter((file): file is File => file !== null);
-
       try {
         await uploadFiles(files, "Pasted image");
       } catch (_error) {
         toast.error("Failed to upload pasted image(s)");
       }
     },
-    [supportsAttachments, uploadFiles]
+    [input, setInput, supportsAttachments, uploadFiles]
   );
 
   useEffect(() => {

@@ -4,13 +4,20 @@ import sharp from "sharp";
 import { z } from "zod";
 
 import { auth } from "@/app/(auth)/auth";
+import { readFormDataWithLimit } from "@/lib/http/request-form-data";
+import { RequestBodyTooLargeError } from "@/lib/http/request-json";
 import { saveUpload } from "@/lib/uploads";
 import { generateUUID } from "@/lib/utils";
+
+const MAX_UPLOAD_FILE_BYTES = 20 * 1024 * 1024;
+const MAX_MULTIPART_OVERHEAD_BYTES = 1024 * 1024;
+const MAX_MULTIPART_BODY_BYTES =
+  MAX_UPLOAD_FILE_BYTES + MAX_MULTIPART_OVERHEAD_BYTES;
 
 const FileSchema = z.object({
   file: z
     .instanceof(Blob)
-    .refine((file) => file.size <= 20 * 1024 * 1024, {
+    .refine((file) => file.size <= MAX_UPLOAD_FILE_BYTES, {
       message: "File size should be less than 20MB",
     })
     .refine(
@@ -34,7 +41,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    const formData = await request.formData();
+    const formData = await readFormDataWithLimit({
+      request,
+      maxBytes: MAX_MULTIPART_BODY_BYTES,
+    });
     const file = formData.get("file") as Blob;
 
     if (!file) {
@@ -87,6 +97,12 @@ export async function POST(request: Request) {
       contentType: file.type,
     });
   } catch (error) {
+    if (error instanceof RequestBodyTooLargeError) {
+      return NextResponse.json(
+        { error: "Request body is too large" },
+        { status: 413 }
+      );
+    }
     console.error("Failed to process upload request:", error);
     return NextResponse.json(
       { error: "Failed to process request" },

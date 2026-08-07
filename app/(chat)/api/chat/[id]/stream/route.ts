@@ -1,8 +1,17 @@
 import { UI_MESSAGE_STREAM_HEADERS } from "ai";
 import { auth } from "@/app/(auth)/auth";
-import { getChatById, getStreamIdsByChatId } from "@/lib/db/queries";
+import {
+  deleteStreamId,
+  getChatById,
+  getRecentStreamIdsByChatId,
+  pruneExpiredStreamIdsByChatId,
+} from "@/lib/db/queries";
 import { ChatbotError } from "@/lib/errors";
-import { getResumableStreamContext } from "@/lib/streams/resumable";
+import {
+  findResumableStream,
+  STREAM_ID_LOOKBACK_LIMIT,
+  STREAM_ID_RETENTION_MS,
+} from "@/lib/streams/resumable";
 
 export async function GET(
   _request: Request,
@@ -22,20 +31,24 @@ export async function GET(
     return new ChatbotError("forbidden:chat").toResponse();
   }
 
-  const streamContext = getResumableStreamContext();
-  if (!streamContext) {
-    return new Response(null, { status: 204 });
-  }
+  const readableStream = await findResumableStream({
+    getStreamIds: () =>
+      getRecentStreamIdsByChatId({
+        chatId: id,
+        limit: STREAM_ID_LOOKBACK_LIMIT,
+      }),
+    deleteStreamId: (streamId) => deleteStreamId({ streamId, chatId: id }),
+    pruneExpiredStreamIds: () =>
+      pruneExpiredStreamIdsByChatId({
+        chatId: id,
+        before: new Date(Date.now() - STREAM_ID_RETENTION_MS),
+      }),
+  });
 
-  const streamIds = await getStreamIdsByChatId({ chatId: id });
-
-  for (const streamId of streamIds.toReversed()) {
-    const stream = await streamContext.resumeExistingStream(streamId);
-    if (stream) {
-      return new Response(stream, {
-        headers: UI_MESSAGE_STREAM_HEADERS,
-      });
-    }
+  if (readableStream) {
+    return new Response(readableStream, {
+      headers: UI_MESSAGE_STREAM_HEADERS,
+    });
   }
 
   return new Response(null, { status: 204 });

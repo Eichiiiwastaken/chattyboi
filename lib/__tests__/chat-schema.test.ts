@@ -84,4 +84,73 @@ describe("postRequestBodySchema", () => {
 
     expect(postRequestBodySchema.safeParse(request).success).toBe(true);
   });
+
+  it("rejects a submit request with no user message or approval", () => {
+    const request = {
+      ...validRequest("hello"),
+      message: undefined,
+      trigger: "submit-message",
+    };
+
+    expect(postRequestBodySchema.safeParse(request).success).toBe(false);
+  });
+
+  it("accepts a compact tool approval delta", () => {
+    const request = {
+      ...validRequest("hello"),
+      message: undefined,
+      messages: [
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          parts: [
+            {
+              type: "tool-weather",
+              toolCallId: "weather-1",
+              state: "approval-responded",
+            },
+          ],
+        },
+      ],
+      trigger: "submit-message",
+    };
+
+    expect(postRequestBodySchema.safeParse(request).success).toBe(true);
+  });
+
+  it("rejects an empty one-time chat", () => {
+    const request = {
+      ...validRequest("hello"),
+      isOneTimeChat: true,
+      message: undefined,
+      messages: [],
+    };
+
+    expect(postRequestBodySchema.safeParse(request).success).toBe(false);
+  });
+
+  it("rejects POST-based stream resume requests", () => {
+    const request = {
+      ...validRequest("hello"),
+      message: undefined,
+      trigger: "resume-stream",
+    };
+
+    expect(postRequestBodySchema.safeParse(request).success).toBe(false);
+  });
+
+  it("rejects ambiguous bodies containing both message forms", () => {
+    const request = {
+      ...validRequest("hello"),
+      messages: [
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          parts: [{ state: "approval-responded" }],
+        },
+      ],
+    };
+
+    expect(postRequestBodySchema.safeParse(request).success).toBe(false);
+  });
 });

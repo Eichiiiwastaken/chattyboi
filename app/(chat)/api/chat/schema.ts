@@ -66,26 +66,79 @@ const userMessageSchema = z
 const toolApprovalMessageSchema = z.object({
   id: z.string(),
   role: z.enum(["user", "assistant"]),
-  parts: z.array(z.record(z.unknown())),
+  parts: z.array(z.record(z.unknown())).max(100),
 });
 
-export const postRequestBodySchema = z.object({
-  id: z.string().uuid(),
-  message: userMessageSchema.optional(),
-  messages: z
-    .array(toolApprovalMessageSchema)
-    .max(MAX_CONTEXT_MESSAGES)
-    .optional(),
-  trigger: z
-    .enum(["submit-message", "regenerate-message", "resume-stream"])
-    .optional(),
-  messageId: z.string().optional(),
-  selectedChatModel: z.string(),
-  selectedReasoningEffort: z.enum(REASONING_EFFORTS).optional(),
-  selectedVisibilityType: z.enum(["public", "private"]),
-  webSearchEnabled: z.boolean().optional(),
-  isOneTimeChat: z.boolean().optional(),
-  clientContextWasTruncated: z.boolean().optional(),
-});
+export const postRequestBodySchema = z
+  .object({
+    id: z.string().uuid(),
+    message: userMessageSchema.optional(),
+    messages: z
+      .array(toolApprovalMessageSchema)
+      .max(MAX_CONTEXT_MESSAGES)
+      .optional(),
+    trigger: z
+      .enum(["submit-message", "regenerate-message", "resume-stream"])
+      .optional(),
+    messageId: z.string().optional(),
+    selectedChatModel: z.string(),
+    selectedReasoningEffort: z.enum(REASONING_EFFORTS).optional(),
+    selectedVisibilityType: z.enum(["public", "private"]),
+    webSearchEnabled: z.boolean().optional(),
+    isOneTimeChat: z.boolean().optional(),
+    clientContextWasTruncated: z.boolean().optional(),
+  })
+  .superRefine((body, context) => {
+    if (body.message && body.messages) {
+      context.addIssue({
+        code: "custom",
+        message: "Send either message or messages, not both.",
+        path: ["messages"],
+      });
+    }
+
+    if (body.trigger === "resume-stream") {
+      context.addIssue({
+        code: "custom",
+        message: "Streams must be resumed through the stream endpoint.",
+        path: ["trigger"],
+      });
+      return;
+    }
+
+    const hasApprovalDelta =
+      body.messages?.some((currentMessage) =>
+        currentMessage.parts.some(
+          (part) =>
+            part.state === "approval-responded" ||
+            part.state === "output-denied"
+        )
+      ) ?? false;
+
+    if (
+      body.isOneTimeChat &&
+      !body.message &&
+      (body.messages?.length ?? 0) === 0
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "One-time chat requires at least one message.",
+        path: ["messages"],
+      });
+    }
+
+    if (
+      !body.isOneTimeChat &&
+      body.trigger !== "regenerate-message" &&
+      !body.message &&
+      !hasApprovalDelta
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Chat submission requires a user message or tool approval.",
+        path: ["message"],
+      });
+    }
+  });
 
 export type PostRequestBody = z.infer<typeof postRequestBodySchema>;
