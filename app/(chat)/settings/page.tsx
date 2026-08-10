@@ -330,6 +330,26 @@ export default function SettingsPage() {
                     </Button>
                   </div>
                 </div>
+                <div className="space-y-2">
+                  <Label className="text-[13px]">Chat with deep research</Label>
+                  <div className="flex items-center gap-1">
+                    <code className="flex-1 rounded-md bg-muted px-3 py-2 text-[12px] text-muted-foreground">
+                      {`${origin}/?q=%s&research=deep`}
+                    </code>
+                    <Button
+                      onClick={async () => {
+                        await copyToClipboard(
+                          `${window.location.origin}/?q=%s&research=deep`
+                        );
+                        toast.success("Copied to clipboard!");
+                      }}
+                      size="icon-xs"
+                      variant="ghost"
+                    >
+                      <Copy className="size-3" />
+                    </Button>
+                  </div>
+                </div>
               </div>
             </section>
           </div>

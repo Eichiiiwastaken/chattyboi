@@ -26,4 +26,57 @@ describe("web search step settings", () => {
       "Do not call tools again."
     );
   });
+
+  it("requires multiple evidence passes for deep research", () => {
+    const settings = getWebSearchStepSettings({
+      baseSystemPrompt: "Base prompt",
+      completedSearches: 1,
+      researchMode: "deep",
+      stepNumber: 1,
+    });
+
+    expect(settings.toolChoice).toBe("required");
+    expect("system" in settings ? settings.system : "").toContain(
+      "Research pass 2"
+    );
+  });
+
+  it("lets deep research finish after its minimum evidence passes", () => {
+    const settings = getWebSearchStepSettings({
+      baseSystemPrompt: "Base prompt",
+      completedSearches: 3,
+      researchMode: "deep",
+      stepNumber: 3,
+    });
+
+    expect(settings.toolChoice).toBe("auto");
+  });
+
+  it("can keep following new evidence beyond five searches", () => {
+    const settings = getWebSearchStepSettings({
+      baseSystemPrompt: "Base prompt",
+      completedSearches: 6,
+      researchMode: "deep",
+      stepNumber: 6,
+    });
+
+    expect(settings.toolChoice).toBe("auto");
+    expect("system" in settings ? settings.system : "").toContain(
+      "newly discovered subtopic"
+    );
+  });
+
+  it("forces synthesis when the deep research search budget is spent", () => {
+    const settings = getWebSearchStepSettings({
+      baseSystemPrompt: "Base prompt",
+      completedSearches: 12,
+      researchMode: "deep",
+      stepNumber: 12,
+    });
+
+    expect(settings.toolChoice).toBe("none");
+    expect("system" in settings ? settings.system : "").toContain(
+      "research phase is complete"
+    );
+  });
 });

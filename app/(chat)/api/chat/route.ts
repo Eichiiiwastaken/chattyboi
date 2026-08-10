@@ -34,6 +34,12 @@ import {
 import { getLanguageModel } from "@/lib/ai/providers";
 import { getReasoningProviderOptions } from "@/lib/ai/reasoning-provider-options";
 import {
+  MAX_DEEP_RESEARCH_ANSWER_CHARACTERS,
+  MAX_DEEP_RESEARCH_ANSWER_TOKENS,
+  MAX_DEEP_RESEARCH_SEARCHES,
+  resolveResearchMode,
+} from "@/lib/ai/research";
+import {
   MAX_SEARCH_ANSWER_TOKENS,
   withSearchAnswerFallback,
 } from "@/lib/ai/search-answer-fallback";
@@ -42,7 +48,7 @@ import {
   extractApprovalDeltas,
   mergeClaimedApprovalParts,
 } from "@/lib/ai/tool-approval";
-import { webSearch } from "@/lib/ai/tools/web-search";
+import { createWebSearchTool } from "@/lib/ai/tools/web-search";
 import { getWebSearchStepSettings } from "@/lib/ai/web-search-step";
 
 import { isProductionEnvironment } from "@/lib/constants";
@@ -197,6 +203,7 @@ export async function POST(request: Request) {
       selectedChatModel,
       selectedReasoningEffort,
       selectedVisibilityType,
+      researchMode,
       webSearchEnabled,
       isOneTimeChat,
       clientContextWasTruncated,
@@ -426,8 +433,18 @@ export async function POST(request: Request) {
     const modelCapabilities = await getCapabilities();
     const capabilities = modelCapabilities[chatModel];
     const isReasoningModel = capabilities?.reasoning === true;
-    const canUseWebSearch =
-      webSearchEnabled === true && capabilities?.tools !== false;
+    const requestedResearchMode = resolveResearchMode({
+      researchMode,
+      webSearchEnabled,
+    });
+    const activeResearchMode =
+      capabilities?.tools === false ? "off" : requestedResearchMode;
+    const canUseWebSearch = activeResearchMode !== "off";
+    const isDeepResearch = activeResearchMode === "deep";
+    const activeWebSearchTool = createWebSearchTool({
+      deepResearch: isDeepResearch,
+      maxCalls: isDeepResearch ? MAX_DEEP_RESEARCH_SEARCHES : 1,
+    });
 
     const recentContext = selectRecentChatMessages(uiMessages);
     const fileSizes = new Map<string, number | null>();
@@ -584,7 +601,7 @@ export async function POST(request: Request) {
         let firstChunkTime: number | undefined;
         let baseSystemPrompt = systemPrompt({
           requestHints,
-          webSearchEnabled: canUseWebSearch,
+          researchMode: activeResearchMode,
         });
         if (contextWasTruncated) {
           baseSystemPrompt +=
@@ -596,15 +613,35 @@ export async function POST(request: Request) {
           system: baseSystemPrompt,
           messages: modelMessages,
           abortSignal: request.signal,
-          maxOutputTokens: canUseWebSearch
-            ? MAX_SEARCH_ANSWER_TOKENS
+          maxOutputTokens: isDeepResearch
+            ? MAX_DEEP_RESEARCH_ANSWER_TOKENS
+            : canUseWebSearch
+              ? MAX_SEARCH_ANSWER_TOKENS
+              : undefined,
+          stopWhen: canUseWebSearch
+            ? stepCountIs(isDeepResearch ? MAX_DEEP_RESEARCH_SEARCHES + 1 : 2)
+            : stepCountIs(5),
+          tools: canUseWebSearch
+            ? { webSearch: activeWebSearchTool }
             : undefined,
-          stopWhen: canUseWebSearch ? stepCountIs(2) : stepCountIs(5),
-          tools: canUseWebSearch ? { webSearch } : undefined,
           toolChoice: canUseWebSearch ? "auto" : "none",
           prepareStep: canUseWebSearch
-            ? ({ stepNumber }) =>
-                getWebSearchStepSettings({ baseSystemPrompt, stepNumber })
+            ? ({ stepNumber, steps }) =>
+                getWebSearchStepSettings({
+                  baseSystemPrompt,
+                  completedSearches: steps.reduce(
+                    (count, step) =>
+                      count +
+                      step.toolResults.filter(
+                        (toolResult) =>
+                          toolResult.toolName === "webSearch" &&
+                          searchResultCount(toolResult.output) > 0
+                      ).length,
+                    0
+                  ),
+                  researchMode: isDeepResearch ? "deep" : "search",
+                  stepNumber,
+                })
             : undefined,
           providerOptions: getReasoningProviderOptions({
             chatModel,
@@ -615,7 +652,9 @@ export async function POST(request: Request) {
             isEnabled: isProductionEnvironment,
             functionId: "stream-text",
           },
-          onStepFinish: (step: StepResult<{ webSearch: typeof webSearch }>) => {
+          onStepFinish: (
+            step: StepResult<{ webSearch: typeof activeWebSearchTool }>
+          ) => {
             if (!canUseWebSearch) {
               return;
             }
@@ -657,13 +696,22 @@ export async function POST(request: Request) {
                       totalTokens: part.totalUsage.totalTokens ?? 0,
                     },
                     duration: Date.now() - startTime,
+                    ...(activeResearchMode === "off"
+                      ? {}
+                      : { researchMode: activeResearchMode }),
                     timeToFirstToken: firstChunkTime,
                   };
                 }
                 return undefined;
               },
             }),
-            { chatId: id, modelId: chatModel }
+            {
+              chatId: id,
+              maxAnswerCharacters: isDeepResearch
+                ? MAX_DEEP_RESEARCH_ANSWER_CHARACTERS
+                : undefined,
+              modelId: chatModel,
+            }
           )
         );
 

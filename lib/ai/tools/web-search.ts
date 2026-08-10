@@ -5,6 +5,7 @@ type TavilyResult = {
   title?: string;
   url?: string;
   content?: string;
+  raw_content?: string;
 };
 
 type ExaResult = {
@@ -18,6 +19,7 @@ type ExaResult = {
 type SearchProvider = "exa" | "tavily";
 type SearchWebOptions = {
   abortSignal?: AbortSignal;
+  deepResearch?: boolean;
 };
 type SearchResult = {
   title: string;
@@ -37,6 +39,9 @@ type SearchWebResult =
     };
 
 const PLACEHOLDER_ENV_PREFIX = "replace-with-";
+const STANDARD_SEARCH_RESULTS = 5;
+const DEEP_RESEARCH_RESULTS = 6;
+const DEEP_RESEARCH_CONTENT_CHARACTERS = 1500;
 const searchProviders = ["exa", "tavily"] as const;
 const searchProviderLabels: Record<SearchProvider, string> = {
   exa: "Exa",
@@ -154,7 +159,8 @@ function searchConfigurationError(
 
 async function searchWithTavily(
   normalizedQuery: string,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
+  deepResearch = false
 ): Promise<SearchWebResult> {
   if (!hasUsableEnvValue(process.env.TAVILY_API_KEY)) {
     return {
@@ -175,7 +181,16 @@ async function searchWithTavily(
       body: JSON.stringify({
         api_key: process.env.TAVILY_API_KEY,
         query: normalizedQuery,
-        max_results: 5,
+        max_results: deepResearch
+          ? DEEP_RESEARCH_RESULTS
+          : STANDARD_SEARCH_RESULTS,
+        ...(deepResearch
+          ? {
+              chunks_per_source: 3,
+              include_raw_content: "markdown",
+              search_depth: "advanced",
+            }
+          : {}),
       }),
       signal: abortSignal,
     });
@@ -203,18 +218,23 @@ async function searchWithTavily(
   }
 
   const data = await response.json();
-  const results = (data.results || []).map((result: TavilyResult) => ({
-    title: result.title ?? "",
-    url: result.url ?? "",
-    content: result.content ?? "",
-  }));
+  const results = normalizeSearchResults(
+    (data.results || []).map((result: TavilyResult) => ({
+      title: result.title ?? "",
+      url: result.url ?? "",
+      content:
+        (deepResearch ? result.raw_content : undefined) ?? result.content ?? "",
+    })),
+    deepResearch
+  );
 
   return { query: normalizedQuery, results };
 }
 
 async function searchWithExa(
   normalizedQuery: string,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
+  deepResearch = false
 ): Promise<SearchWebResult> {
   if (!hasUsableEnvValue(process.env.EXA_API_KEY)) {
     return {
@@ -237,10 +257,17 @@ async function searchWithExa(
       },
       body: JSON.stringify({
         query: normalizedQuery,
-        numResults: 5,
-        contents: {
-          highlights: true,
-        },
+        numResults: deepResearch
+          ? DEEP_RESEARCH_RESULTS
+          : STANDARD_SEARCH_RESULTS,
+        contents: deepResearch
+          ? {
+              highlights: true,
+              text: { maxCharacters: DEEP_RESEARCH_CONTENT_CHARACTERS },
+            }
+          : {
+              highlights: true,
+            },
       }),
       signal: abortSignal,
     });
@@ -268,24 +295,66 @@ async function searchWithExa(
   }
 
   const data = await response.json();
-  const results = (data.results || []).map((result: ExaResult) => ({
-    title: result.title ?? "",
-    url: result.url ?? "",
-    content: getExaContent(result),
-  }));
+  const results = normalizeSearchResults(
+    (data.results || []).map((result: ExaResult) => ({
+      title: result.title ?? "",
+      url: result.url ?? "",
+      content: getExaContent(result, deepResearch),
+    })),
+    deepResearch
+  );
 
   return { query: normalizedQuery, results };
 }
 
-function getExaContent(result: ExaResult) {
+function getExaContent(result: ExaResult, deepResearch = false) {
   const highlights = result.highlights?.filter(Boolean).join("\n");
+
+  if (deepResearch) {
+    return result.text || highlights || result.summary || "";
+  }
 
   return highlights || result.text || result.summary || "";
 }
 
+function normalizeSearchResults(
+  results: SearchResult[],
+  deepResearch: boolean
+) {
+  const seenUrls = new Set<string>();
+
+  return results.flatMap((result) => {
+    let url: URL;
+
+    try {
+      url = new URL(result.url);
+    } catch {
+      return [];
+    }
+
+    if (
+      (url.protocol !== "http:" && url.protocol !== "https:") ||
+      seenUrls.has(url.href)
+    ) {
+      return [];
+    }
+
+    seenUrls.add(url.href);
+    const contentLimit = deepResearch ? DEEP_RESEARCH_CONTENT_CHARACTERS : 2000;
+
+    return [
+      {
+        title: result.title.trim() || url.hostname,
+        url: url.href,
+        content: result.content.trim().slice(0, contentLimit),
+      },
+    ];
+  });
+}
+
 export async function searchWeb(
   query: string,
-  { abortSignal }: SearchWebOptions = {}
+  { abortSignal, deepResearch = false }: SearchWebOptions = {}
 ): Promise<SearchWebResult> {
   const normalizedQuery = query.trim();
 
@@ -305,11 +374,11 @@ export async function searchWeb(
   const { provider } = configuredSearchProvider;
 
   if (provider === "exa") {
-    return await searchWithExa(normalizedQuery, abortSignal);
+    return await searchWithExa(normalizedQuery, abortSignal, deepResearch);
   }
 
   if (provider === "tavily") {
-    return await searchWithTavily(normalizedQuery, abortSignal);
+    return await searchWithTavily(normalizedQuery, abortSignal, deepResearch);
   }
 
   return searchConfigurationError(
@@ -318,18 +387,42 @@ export async function searchWeb(
   );
 }
 
-export const webSearch = tool({
-  description:
-    "Search the web for up-to-date information. YOU MAY ONLY CALL THIS TOOL ONCE per turn — after calling it, you will not be able to call it again. Ask the single best search query for the user's request.",
-  inputSchema: z.object({
-    query: z
-      .string()
-      .min(1)
-      .max(300)
-      .describe(
-        "The search query to run. Rewrite the user's request into the best web search query."
-      ),
-  }),
-  execute: async ({ query }, { abortSignal }) =>
-    searchWeb(query, { abortSignal }),
-});
+export function createWebSearchTool({
+  deepResearch = false,
+  maxCalls,
+}: {
+  deepResearch?: boolean;
+  maxCalls?: number;
+} = {}) {
+  let callCount = 0;
+
+  return tool({
+    description: deepResearch
+      ? "Run one focused web research query and return extracted source content. Use a new query on each research pass to fill an evidence gap, find a primary source, or verify a claim."
+      : "Search the web for up-to-date information. You may only call this tool once per turn, so use the single best search query for the user's request.",
+    inputSchema: z.object({
+      query: z
+        .string()
+        .min(1)
+        .max(300)
+        .describe(
+          "A concise, focused web search query. Include names, dates, or source types that improve precision."
+        ),
+    }),
+    execute: ({ query }, { abortSignal }) => {
+      if (maxCalls !== undefined && callCount >= maxCalls) {
+        return {
+          query,
+          error: `The ${deepResearch ? "deep research" : "web search"} search budget is exhausted. Answer from the sources already collected.`,
+          status: 429,
+          results: [] as [],
+        };
+      }
+
+      callCount += 1;
+      return searchWeb(query, { abortSignal, deepResearch });
+    },
+  });
+}
+
+export const webSearch = createWebSearchTool();

@@ -22,8 +22,14 @@ function searchResultCount(output: unknown) {
 
 export function withSearchAnswerFallback(
   stream: ReadableStream<InferUIMessageChunk<ChatMessage>>,
-  context: { chatId: string; modelId: string }
+  context: {
+    chatId: string;
+    maxAnswerCharacters?: number;
+    modelId: string;
+  }
 ) {
+  const maxAnswerCharacters =
+    context.maxAnswerCharacters ?? MAX_SEARCH_ANSWER_CHARACTERS;
   let sawSearchOutput = false;
   let sawText = false;
   let sawTextAfterSearch = false;
@@ -51,7 +57,7 @@ export function withSearchAnswerFallback(
         }
 
         if (sawSearchOutput && chunk.type === "text-delta") {
-          const remaining = MAX_SEARCH_ANSWER_CHARACTERS - searchAnswerLength;
+          const remaining = maxAnswerCharacters - searchAnswerLength;
           const delta = chunk.delta.slice(0, Math.max(remaining, 0));
 
           if (delta.trim().length > 0) {

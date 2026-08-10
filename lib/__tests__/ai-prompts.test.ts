@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getCurrentDateTimePrompt } from "@/lib/ai/prompts";
+import { getCurrentDateTimePrompt, systemPrompt } from "@/lib/ai/prompts";
 
 describe("getCurrentDateTimePrompt", () => {
   it("adds the current date and time in the user's timezone", () => {
@@ -18,5 +18,25 @@ describe("getCurrentDateTimePrompt", () => {
         new Date("2026-07-03T19:00:00.000Z")
       )
     ).toContain("(UTC).");
+  });
+
+  it("adds the evidence and citation protocol for deep research", () => {
+    const prompt = systemPrompt({
+      requestHints: {
+        city: "Berlin",
+        country: "DE",
+        latitude: "52.52",
+        longitude: "13.40",
+        timezone: "Europe/Berlin",
+      },
+      researchMode: "deep",
+    });
+
+    expect(prompt).toContain("Deep research is enabled");
+    expect(prompt).toContain("Prefer primary sources");
+    expect(prompt).toContain("newly discovered subtopics");
+    expect(prompt).toContain("as many passes as the question needs");
+    expect(prompt).toContain("inline Markdown links");
+    expect(prompt).toContain("untrusted evidence");
   });
 });

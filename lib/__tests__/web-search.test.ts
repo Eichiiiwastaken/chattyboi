@@ -114,6 +114,53 @@ describe("web search", () => {
     );
   });
 
+  it("uses advanced extraction and more sources for deep research", async () => {
+    vi.stubEnv("WEB_SEARCH_PROVIDER", "tavily");
+    vi.stubEnv("TAVILY_API_KEY", "tavily-test-key");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          results: [
+            {
+              title: "Primary source",
+              url: "https://example.com/primary",
+              content: "Short excerpt",
+              raw_content: "Full extracted page",
+            },
+          ],
+        })
+      )
+    );
+
+    await expect(
+      searchWeb("evidence query", { deepResearch: true })
+    ).resolves.toEqual({
+      query: "evidence query",
+      results: [
+        {
+          title: "Primary source",
+          url: "https://example.com/primary",
+          content: "Full extracted page",
+        },
+      ],
+    });
+
+    expect(fetch).toHaveBeenCalledWith(
+      "https://api.tavily.com/search",
+      expect.objectContaining({
+        body: JSON.stringify({
+          api_key: "tavily-test-key",
+          query: "evidence query",
+          max_results: 6,
+          chunks_per_source: 3,
+          include_raw_content: "markdown",
+          search_depth: "advanced",
+        }),
+      })
+    );
+  });
+
   it("does not treat placeholder search keys as configured", async () => {
     vi.stubEnv("EXA_API_KEY", "replace-with-exa-api-key");
     vi.stubEnv("TAVILY_API_KEY", "replace-with-tavily-api-key");

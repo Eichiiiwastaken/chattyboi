@@ -42,6 +42,7 @@ import {
   titleModel,
 } from "@/lib/ai/models";
 import type { ReasoningEffort } from "@/lib/ai/reasoning";
+import type { ResearchMode } from "@/lib/ai/research";
 import { markdownFromClipboard } from "@/lib/markdown/clipboard";
 import type { Attachment, ChatMessage } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -143,8 +144,7 @@ function PureMultimodalInput({
   const router = useRouter();
   const { mutate } = useSWRConfig();
   const { setTheme, resolvedTheme } = useTheme();
-  const { webSearchEnabled, setWebSearchEnabled, setSearchSources } =
-    useActiveChat();
+  const { researchMode, setResearchMode, setSearchSources } = useActiveChat();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const previousChatIdRef = useRef(chatId);
   const { width } = useWindowSize();
@@ -303,7 +303,7 @@ function PureMultimodalInput({
       router.push(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/chat/${chatId}`);
     }
 
-    if (!webSearchEnabled) {
+    if (researchMode === "off") {
       setSearchSources(null);
     }
 
@@ -323,8 +323,8 @@ function PureMultimodalInput({
           },
         ],
       },
-      webSearchEnabled && input.trim()
-        ? { body: { webSearchEnabled: true } }
+      researchMode !== "off" && input.trim()
+        ? { body: { researchMode } }
         : undefined
     );
 
@@ -345,7 +345,7 @@ function PureMultimodalInput({
     width,
     chatId,
     router,
-    webSearchEnabled,
+    researchMode,
     setSearchSources,
     isOneTimeChat,
   ]);
@@ -724,9 +724,9 @@ function PureMultimodalInput({
         />
         <PromptInputFooter className="flex-wrap items-end gap-2 px-3 pb-3">
           <PromptInputTools className="min-w-0 flex-1 overflow-hidden">
-            <WebSearchButton
-              enabled={webSearchEnabled}
-              onToggle={setWebSearchEnabled}
+            <ResearchModeButton
+              mode={researchMode}
+              onChange={setResearchMode}
               status={status}
             />
             {supportsAttachments && (
@@ -840,37 +840,86 @@ function PureAttachmentsButton({
 
 const AttachmentsButton = memo(PureAttachmentsButton);
 
-function PureWebSearchButton({
-  enabled,
-  onToggle,
+function PureResearchModeButton({
+  mode,
+  onChange,
   status,
 }: {
-  enabled: boolean;
-  onToggle: (enabled: boolean) => void;
+  mode: ResearchMode;
+  onChange: (mode: ResearchMode) => void;
   status: UseChatHelpers<ChatMessage>["status"];
 }) {
+  const enabled = mode !== "off";
+
   return (
-    <Button
-      className={cn(
-        "h-9 w-9 shrink-0 rounded-lg border p-1 transition-colors sm:h-7 sm:w-7",
-        enabled
-          ? "border-primary/50 bg-primary/10 text-primary hover:bg-primary/20"
-          : "border-border/40 text-foreground hover:border-border hover:text-foreground"
-      )}
-      data-testid="web-search-button"
-      disabled={status !== "ready"}
-      onClick={(event) => {
-        event.preventDefault();
-        onToggle(!enabled);
-      }}
-      variant="ghost"
-    >
-      {enabled ? <T3GlobeIcon size={16} /> : <T3GlobeOffIcon size={16} />}
-    </Button>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          aria-label={
+            mode === "deep"
+              ? "Deep research enabled"
+              : enabled
+                ? "Web search enabled"
+                : "Research mode"
+          }
+          className={cn(
+            "h-9 shrink-0 gap-1.5 rounded-lg border px-2 transition-colors sm:h-7",
+            enabled
+              ? "border-primary/50 bg-primary/10 text-primary hover:bg-primary/20"
+              : "w-9 border-border/40 p-1 text-foreground hover:border-border hover:text-foreground sm:w-7"
+          )}
+          data-testid="web-search-button"
+          disabled={status !== "ready"}
+          type="button"
+          variant="ghost"
+        >
+          {mode === "off" ? (
+            <T3GlobeOffIcon size={16} />
+          ) : (
+            <T3GlobeIcon size={16} />
+          )}
+          {mode === "deep" && (
+            <span className="hidden text-[11px] sm:inline">Deep</span>
+          )}
+          {enabled && <ChevronDownIcon className="size-3 opacity-70" />}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-64">
+        <DropdownMenuRadioGroup
+          onValueChange={(value) => onChange(value as ResearchMode)}
+          value={mode}
+        >
+          <DropdownMenuRadioItem value="off">
+            <div>
+              <div className="font-medium">Off</div>
+              <div className="text-[11px] text-muted-foreground">
+                Answer without web research
+              </div>
+            </div>
+          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="search">
+            <div>
+              <div className="font-medium">Web search</div>
+              <div className="text-[11px] text-muted-foreground">
+                One focused search for a quick answer
+              </div>
+            </div>
+          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="deep">
+            <div>
+              <div className="font-medium">Deep research</div>
+              <div className="text-[11px] text-muted-foreground">
+                Adaptive multi-query investigation with cross-checking
+              </div>
+            </div>
+          </DropdownMenuRadioItem>
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
-const WebSearchButton = memo(PureWebSearchButton);
+const ResearchModeButton = memo(PureResearchModeButton);
 
 const reasoningEffortLabels: Record<ReasoningEffort, string> = {
   auto: "Auto",

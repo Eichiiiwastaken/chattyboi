@@ -42,6 +42,24 @@ describe("postRequestBodySchema", () => {
     expect(result.success).toBe(false);
   });
 
+  it("accepts deep research mode", () => {
+    const result = postRequestBodySchema.safeParse({
+      ...validRequest("investigate this"),
+      researchMode: "deep",
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects unsupported research modes", () => {
+    const result = postRequestBodySchema.safeParse({
+      ...validRequest("investigate this"),
+      researchMode: "unbounded",
+    });
+
+    expect(result.success).toBe(false);
+  });
+
   it("rejects text that exceeds the chat text limit", () => {
     const result = postRequestBodySchema.safeParse(
       validRequest("a".repeat(MAX_CHAT_TEXT_LENGTH + 1))

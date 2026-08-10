@@ -61,7 +61,7 @@ export function ChatShell() {
     setCurrentModelId,
     showCreditCardAlert,
     setShowCreditCardAlert,
-    webSearchEnabled,
+    researchMode,
     reasoningEffort,
     setReasoningEffort,
     searchSources,
@@ -136,7 +136,7 @@ export function ChatShell() {
           setCookie("chat-model", modelId);
         }
 
-        if (!webSearchEnabled) {
+        if (researchMode === "off") {
           setSearchSources(null);
         }
 
@@ -144,7 +144,7 @@ export function ChatShell() {
           messageId: message.id,
           body: {
             selectedChatModel: retryModelId,
-            ...(webSearchEnabled ? { webSearchEnabled: true } : {}),
+            ...(researchMode === "off" ? {} : { researchMode }),
           },
         });
       } catch (error) {
@@ -156,10 +156,10 @@ export function ChatShell() {
       clearGenerationError,
       currentModelId,
       regenerate,
+      researchMode,
       setCurrentModelId,
       setSearchSources,
       setGenerationErrorFromUnknown,
-      webSearchEnabled,
     ]
   );
 

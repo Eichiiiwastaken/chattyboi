@@ -20,6 +20,8 @@
 - [Neon Serverless Postgres](https://vercel.com/marketplace/neon) for chat history and user data
 - [Vercel Blob](https://vercel.com/storage/blob) for file storage
 - [Auth.js](https://authjs.dev) authentication
+- Web search and multi-pass deep research with Exa or Tavily, including
+  extracted source content and inline citations
 
 ## Model Providers
 

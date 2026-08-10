@@ -26,6 +26,7 @@ import { useAutoResume } from "@/hooks/use-auto-resume";
 import { selectChatRequestMessages } from "@/lib/ai/chat-request";
 import { DEFAULT_CHAT_MODEL } from "@/lib/ai/models";
 import { isReasoningEffort, type ReasoningEffort } from "@/lib/ai/reasoning";
+import { isResearchMode, type ResearchMode } from "@/lib/ai/research";
 import type { Settings, Vote } from "@/lib/db/schema";
 import { ChatbotError, getErrorMessageFromUnknown } from "@/lib/errors";
 import type { ChatMessage } from "@/lib/types";
@@ -79,6 +80,8 @@ type ActiveChatContextValue = {
   setShowCreditCardAlert: Dispatch<SetStateAction<boolean>>;
   webSearchEnabled: boolean;
   setWebSearchEnabled: (enabled: boolean) => void;
+  researchMode: ResearchMode;
+  setResearchMode: (mode: ResearchMode) => void;
   reasoningEffort: ReasoningEffort;
   setReasoningEffort: (effort: ReasoningEffort) => void;
   searchSources: SearchSource[] | null;
@@ -150,7 +153,17 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
 
   const [input, setInput] = useState("");
   const [showCreditCardAlert, setShowCreditCardAlert] = useState(false);
-  const [webSearchEnabled, setWebSearchEnabled] = useState(false);
+  const [researchMode, setResearchModeState] = useState<ResearchMode>("off");
+  const researchModeRef = useRef<ResearchMode>(researchMode);
+  const setResearchMode = useCallback((mode: ResearchMode) => {
+    researchModeRef.current = mode;
+    setResearchModeState(mode);
+  }, []);
+  const webSearchEnabled = researchMode !== "off";
+  const setWebSearchEnabled = useCallback(
+    (enabled: boolean) => setResearchMode(enabled ? "search" : "off"),
+    [setResearchMode]
+  );
   const [reasoningEffort, setReasoningEffortState] =
     useState<ReasoningEffort>("auto");
   const reasoningEffortRef = useRef(reasoningEffort);
@@ -243,9 +256,9 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
     hasAppliedDefaultsRef.current = true;
 
     if (settings.webSearchEnabled) {
-      setWebSearchEnabled(true);
+      setResearchMode("search");
     }
-  }, [settings, isNewChat]);
+  }, [settings, isNewChat, setResearchMode]);
 
   // Keep the messages passed to useChat referentially stable. In particular,
   // `chatData` is briefly undefined while navigating a newly submitted chat to
@@ -315,6 +328,7 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
             selectedChatModel: currentModelIdRef.current,
             selectedReasoningEffort: reasoningEffortRef.current,
             selectedVisibilityType: visibility,
+            researchMode: researchModeRef.current,
             isOneTimeChat,
             ...request.body,
           },
@@ -546,6 +560,7 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
     const params = new URLSearchParams(window.location.search);
     const query = params.get("q") ?? params.get("query");
     const searchParam = params.get("search");
+    const researchParam = params.get("research");
     const effortParam = params.get("effort");
 
     if (query && !hasAppendedQueryRef.current) {
@@ -556,10 +571,14 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
       hasAppendedQueryRef.current = true;
 
       // Enable web search if ?search=true or ?search=1 is present
-      const shouldSearch = searchParam === "true" || searchParam === "1";
-      if (shouldSearch) {
-        setWebSearchEnabled(true);
-      }
+      const requestedResearchMode = isResearchMode(researchParam)
+        ? researchParam
+        : searchParam === "deep"
+          ? "deep"
+          : searchParam === "true" || searchParam === "1"
+            ? "search"
+            : "off";
+      setResearchMode(requestedResearchMode);
 
       if (isReasoningEffort(effortParam)) {
         setReasoningEffort(effortParam);
@@ -582,7 +601,9 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
             role: "user" as const,
             parts: [{ type: "text", text: query }],
           },
-          shouldSearch ? { body: { webSearchEnabled: true } } : undefined
+          requestedResearchMode === "off"
+            ? undefined
+            : { body: { researchMode: requestedResearchMode } }
         );
       };
 
@@ -597,6 +618,7 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
     settingsData,
     settingsError,
     setReasoningEffort,
+    setResearchMode,
     setCurrentModelId,
   ]);
 
@@ -640,6 +662,8 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
       setShowCreditCardAlert,
       webSearchEnabled,
       setWebSearchEnabled,
+      researchMode,
+      setResearchMode,
       reasoningEffort,
       setReasoningEffort,
       searchSources,
@@ -677,6 +701,9 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
       currentModelId,
       showCreditCardAlert,
       webSearchEnabled,
+      setWebSearchEnabled,
+      researchMode,
+      setResearchMode,
       reasoningEffort,
       searchSources,
       generationError,

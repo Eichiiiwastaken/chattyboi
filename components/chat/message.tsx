@@ -706,6 +706,50 @@ function QuoteSelectionPopover({
   );
 }
 
+function getSearchSourcesFromMessage(message: ChatMessage) {
+  return message.parts.flatMap((part) => {
+    if (part.type !== "tool-webSearch" || !("output" in part)) {
+      return [];
+    }
+
+    const output = part.output;
+    if (
+      !output ||
+      typeof output !== "object" ||
+      !("results" in output) ||
+      !Array.isArray(output.results)
+    ) {
+      return [];
+    }
+
+    return output.results.flatMap((result) => {
+      if (!result || typeof result !== "object") {
+        return [];
+      }
+
+      const title = "title" in result ? result.title : undefined;
+      const url = "url" in result ? result.url : undefined;
+      return typeof title === "string" && typeof url === "string"
+        ? [{ title, url }]
+        : [];
+    });
+  });
+}
+
+function mergeSearchSources(
+  ...sourceGroups: Array<Array<{ title: string; url: string }>>
+) {
+  const sources = new Map<string, { title: string; url: string }>();
+
+  for (const source of sourceGroups.flat()) {
+    if (!sources.has(source.url)) {
+      sources.set(source.url, source);
+    }
+  }
+
+  return [...sources.values()];
+}
+
 const PurePreviewMessage = ({
   addToolApprovalResponse,
   chatId,
@@ -754,6 +798,12 @@ const PurePreviewMessage = ({
 
   const isUser = message.role === "user";
   const isAssistant = message.role === "assistant";
+  const displayedSearchSources = mergeSearchSources(
+    searchSources ?? [],
+    message.metadata?.researchMode === "deep"
+      ? getSearchSourcesFromMessage(message)
+      : []
+  );
 
   const hasAnyContent = message.parts?.some(
     (part) =>
@@ -1107,13 +1157,15 @@ const PurePreviewMessage = ({
         />
       )}
       {actions}
-      {isAssistant && searchSources && searchSources.length > 0 && (
+      {isAssistant && displayedSearchSources.length > 0 && (
         <div className="mt-2 space-y-1">
           <p className="text-[11px] font-medium text-muted-foreground/70">
-            Sources
+            {message.metadata?.researchMode === "deep"
+              ? `Research sources (${displayedSearchSources.length})`
+              : "Sources"}
           </p>
           <div className="flex flex-wrap gap-1.5">
-            {searchSources.map((source) => (
+            {displayedSearchSources.map((source) => (
               <a
                 className="inline-flex items-center gap-1 rounded-md border border-border/40 bg-muted/50 px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 href={source.url}

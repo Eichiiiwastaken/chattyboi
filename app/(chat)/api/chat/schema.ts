@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { MAX_CONTEXT_FILES, MAX_CONTEXT_MESSAGES } from "@/lib/ai/chat-context";
 import { REASONING_EFFORTS } from "@/lib/ai/reasoning";
+import { RESEARCH_MODES } from "@/lib/ai/research";
 
 export const MAX_CHAT_TEXT_LENGTH = 100_000;
 
@@ -85,6 +86,7 @@ export const postRequestBodySchema = z
     selectedReasoningEffort: z.enum(REASONING_EFFORTS).optional(),
     selectedVisibilityType: z.enum(["public", "private"]),
     webSearchEnabled: z.boolean().optional(),
+    researchMode: z.enum(RESEARCH_MODES).optional(),
     isOneTimeChat: z.boolean().optional(),
     clientContextWasTruncated: z.boolean().optional(),
   })

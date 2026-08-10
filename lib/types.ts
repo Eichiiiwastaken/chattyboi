@@ -1,6 +1,7 @@
 import type { InferUITool, UIMessage } from "ai";
 import { z } from "zod";
 import type { ArtifactKind } from "@/components/chat/artifact";
+import { RESEARCH_MODES } from "./ai/research";
 import type { createDocument } from "./ai/tools/create-document";
 import type { getWeather } from "./ai/tools/get-weather";
 import type { requestSuggestions } from "./ai/tools/request-suggestions";
@@ -21,6 +22,7 @@ export const messageMetadataSchema = z.object({
     .optional(),
   duration: z.number().optional(),
   timeToFirstToken: z.number().optional(),
+  researchMode: z.enum(RESEARCH_MODES).optional(),
 });
 
 export type MessageMetadata = z.infer<typeof messageMetadataSchema>;
