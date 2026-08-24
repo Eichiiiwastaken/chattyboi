@@ -5,7 +5,15 @@ import postgres from "postgres";
 const runMigrate = async () => {
   try {
     const { config } = await import("dotenv");
-    config({ path: ".env" });
+    const environment = process.env.NODE_ENV ?? "development";
+    for (const path of [
+      `.env.${environment}.local`,
+      ".env.local",
+      `.env.${environment}`,
+      ".env",
+    ]) {
+      config({ path, override: false });
+    }
   } catch {
     // dotenv not available (e.g. in production Docker), env vars are already set
   }

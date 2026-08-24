@@ -29,6 +29,28 @@ chattyboi uses the [Vercel AI Gateway](https://vercel.com/docs/ai-gateway) to ac
 
 `lib/ai/providers.ts` configures OpenCodeGo and OpenRouter directly.
 
+## Local development
+
+The local development stack uses disposable development credentials and
+dependency containers that are separate from the production Compose setup.
+
+```bash
+pnpm install
+pnpm dev:setup
+pnpm dev
+```
+
+Open `http://localhost:3000` and sign in with `local-dev` for both the username
+and password. The values in `.env.development` are intentionally local-only;
+production still requires its own `AUTH_SECRET`, `ALLOWED_USERS`, and database
+configuration.
+
+To stop the local Postgres and Redis containers:
+
+```bash
+pnpm dev:services:down
+```
+
 ## Deployment
 
 Docker Compose runs chattyboi. GitHub Actions builds the image and pushes it to GitHub Container Registry.

@@ -32,9 +32,9 @@ function PureChatHeader({
   }
 
   return (
-    <header className="absolute top-[calc(0.75rem+env(safe-area-inset-top))] left-3 z-20 flex h-10 w-fit items-center gap-1 rounded-full border border-border/50 bg-background/90 p-1 shadow-sm backdrop-blur-md">
+    <header className="absolute top-[calc(0.75rem+env(safe-area-inset-top))] left-3 z-20 flex h-10 w-fit items-center gap-1">
       <Button
-        className="rounded-full md:hidden"
+        className="rounded-full border border-border/50 bg-background/90 shadow-sm backdrop-blur-md md:hidden"
         onClick={toggleSidebar}
         size="icon-sm"
         variant="ghost"
@@ -43,7 +43,7 @@ function PureChatHeader({
       </Button>
 
       {showOneTimeOption ? (
-        <div className="flex h-8 items-center gap-2 rounded-full px-2.5 text-muted-foreground text-xs transition-colors hover:text-foreground">
+        <div className="flex h-8 items-center gap-2 rounded-full border border-border/50 bg-background/90 px-2.5 text-muted-foreground text-xs shadow-sm backdrop-blur-md transition-colors hover:text-foreground">
           <ClockIcon className="size-3.5" />
           <span>One-time chat</span>
           <Switch
@@ -60,7 +60,7 @@ function PureChatHeader({
           />
         </div>
       ) : isOneTimeChat ? (
-        <div className="flex h-8 items-center gap-2 rounded-full px-2.5 text-muted-foreground text-xs">
+        <div className="flex h-8 items-center gap-2 rounded-full border border-border/50 bg-background/90 px-2.5 text-muted-foreground text-xs shadow-sm backdrop-blur-md">
           <ClockIcon className="size-3.5" />
           One-time chat
         </div>
@@ -68,7 +68,7 @@ function PureChatHeader({
         !isReadonly && (
           <VisibilitySelector
             chatId={chatId}
-            className="rounded-full border-transparent bg-transparent hover:bg-muted/70"
+            className="rounded-full border-border/50 bg-background/90 shadow-sm backdrop-blur-md hover:bg-muted/70"
             selectedVisibilityType={selectedVisibilityType}
           />
         )
