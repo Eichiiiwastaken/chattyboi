@@ -397,14 +397,13 @@ async function fetchPublicOpenRouterModels({
       return [];
     }
     const json = await res.json();
-    return (json.data ?? []).map(
-      (m: { id: string; name?: string; description?: string }) => ({
-        id: gatewayIds ? m.id : `openrouter/${m.id}`,
-        name: m.name || m.id,
-        provider: m.id.split("/")[0] ?? (gatewayIds ? "gateway" : "openrouter"),
-        description: m.description ?? "",
-      })
-    );
+    return (json.data ?? []).map((m: OpenRouterRawModel) => ({
+      id: gatewayIds ? m.id : `openrouter/${m.id}`,
+      name: m.name || m.id,
+      provider: m.id.split("/")[0] ?? (gatewayIds ? "gateway" : "openrouter"),
+      description: m.description ?? "",
+      pricing: parsePricing(m),
+    }));
   } catch {
     return [];
   }
@@ -434,6 +433,7 @@ export async function getAllModels(): Promise<ChatModel[]> {
 type OpenRouterRawModel = {
   id: string;
   name?: string;
+  description?: string;
   architecture?: { input_modalities?: string[] };
   pricing?: { prompt?: string; completion?: string };
   supported_parameters?: string[];

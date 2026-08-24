@@ -105,6 +105,37 @@ describe("provider model discovery", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  it("uses OpenRouter catalog pricing for direct OpenRouter models", async () => {
+    vi.stubEnv("OPENROUTER_API_KEY", "sk-or-test");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      json: async () => ({
+        data: [
+          {
+            description: "Fast OpenAI model",
+            id: "openai/gpt-5.6-luna",
+            name: "OpenAI: GPT-5.6 Luna",
+            pricing: {
+              completion: "0.0000012",
+              prompt: "0.0000002",
+            },
+          },
+        ],
+      }),
+      ok: true,
+    } as Response);
+    const { fetchOpenRouterModels } = await import("../ai/models");
+
+    await expect(fetchOpenRouterModels()).resolves.toEqual([
+      {
+        description: "Fast OpenAI model",
+        id: "openrouter/openai/gpt-5.6-luna",
+        name: "OpenAI: GPT-5.6 Luna",
+        pricing: { inputPerMillion: 0.2, outputPerMillion: 1.2 },
+        provider: "openai",
+      },
+    ]);
+  });
+
   it("does not fetch OpenCode Go models without an OpenCode API key", async () => {
     vi.stubEnv("OPENCODE_API_KEY", "");
     const fetchSpy = vi.spyOn(globalThis, "fetch");
