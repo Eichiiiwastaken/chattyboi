@@ -199,6 +199,12 @@ textarea:focus-visible {
   color: white;
 }
 
+/* KaTeX renders hidden MathML alongside its visible HTML. Excluding the
+   accessibility copy from selection prevents quoted formulas from doubling. */
+[data-testid="message-content"] .katex-mathml {
+  user-select: none;
+}
+
 @utility text-balance {
   text-wrap: balance;
 }
