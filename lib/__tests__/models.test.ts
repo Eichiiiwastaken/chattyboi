@@ -81,6 +81,20 @@ describe("Mock Models", () => {
   });
 });
 
+describe("estimateTokenCost", () => {
+  it("combines input and output tokens using per-million rates", async () => {
+    const { estimateTokenCost } = await import("../ai/models");
+
+    expect(
+      estimateTokenCost({
+        inputTokens: 2000,
+        outputTokens: 500,
+        pricing: { inputPerMillion: 2.5, outputPerMillion: 10 },
+      })
+    ).toBe(0.01);
+  });
+});
+
 describe("provider model discovery", () => {
   it("does not fetch OpenRouter models without an OpenRouter API key", async () => {
     vi.stubEnv("OPENROUTER_API_KEY", "");

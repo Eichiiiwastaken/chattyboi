@@ -22,6 +22,7 @@ export const messageMetadataSchema = z.object({
     .optional(),
   duration: z.number().optional(),
   timeToFirstToken: z.number().optional(),
+  estimatedCost: z.number().nonnegative().optional(),
   researchMode: z.enum(RESEARCH_MODES).optional(),
 });
 

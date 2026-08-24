@@ -22,6 +22,7 @@ import { shouldPersistChatStream } from "@/lib/ai/chat-persistence";
 import { entitlementsByUserType } from "@/lib/ai/entitlements";
 import {
   DEFAULT_CHAT_MODEL,
+  estimateTokenCost,
   getAllModels,
   getAllowedModelIds,
   getCapabilities,
@@ -428,7 +429,9 @@ export async function POST(request: Request) {
     }
 
     const models = await getAllModels();
-    const modelName = models.find((m) => m.id === chatModel)?.name ?? chatModel;
+    const selectedModel = models.find((model) => model.id === chatModel);
+    const modelName = selectedModel?.name ?? chatModel;
+    const modelPricing = selectedModel?.pricing;
 
     const modelCapabilities = await getCapabilities();
     const capabilities = modelCapabilities[chatModel];
@@ -687,14 +690,26 @@ export async function POST(request: Request) {
               sendReasoning: isReasoningModel,
               messageMetadata: ({ part }) => {
                 if (part.type === "finish") {
+                  const inputTokens = part.totalUsage.inputTokens ?? 0;
+                  const outputTokens = part.totalUsage.outputTokens ?? 0;
+
                   return {
                     modelId: chatModel,
                     modelName,
                     usage: {
-                      inputTokens: part.totalUsage.inputTokens ?? 0,
-                      outputTokens: part.totalUsage.outputTokens ?? 0,
+                      inputTokens,
+                      outputTokens,
                       totalTokens: part.totalUsage.totalTokens ?? 0,
                     },
+                    ...(modelPricing
+                      ? {
+                          estimatedCost: estimateTokenCost({
+                            inputTokens,
+                            outputTokens,
+                            pricing: modelPricing,
+                          }),
+                        }
+                      : {}),
                     duration: Date.now() - startTime,
                     ...(activeResearchMode === "off"
                       ? {}

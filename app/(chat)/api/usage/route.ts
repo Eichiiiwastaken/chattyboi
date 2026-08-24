@@ -1,5 +1,8 @@
 import { auth } from "@/app/(auth)/auth";
-import { getEstimatedPricingForModelIds } from "@/lib/ai/models";
+import {
+  estimateTokenCost,
+  getEstimatedPricingForModelIds,
+} from "@/lib/ai/models";
 import { getUsageMessagesByUserId } from "@/lib/db/queries";
 import { ChatbotError } from "@/lib/errors";
 import { messageMetadataSchema } from "@/lib/types";
@@ -177,9 +180,11 @@ export async function GET(request: Request) {
         ...item,
         estimatedCost:
           item.id && pricing[item.id]
-            ? (item.inputTokens * pricing[item.id].inputPerMillion +
-                item.outputTokens * pricing[item.id].outputPerMillion) /
-              1_000_000
+            ? estimateTokenCost({
+                inputTokens: item.inputTokens,
+                outputTokens: item.outputTokens,
+                pricing: pricing[item.id],
+              })
             : undefined,
         pricing: item.id ? pricing[item.id] : undefined,
         averageLatency: item.latencySamples

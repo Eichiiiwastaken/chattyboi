@@ -1,6 +1,19 @@
-import { Puzzle, Timer, Zap } from "lucide-react";
+import { CircleDollarSign, Puzzle, Timer, Zap } from "lucide-react";
 import type { ChatMessage } from "@/lib/types";
 import { cn } from "@/lib/utils";
+
+function formatEstimatedCost(cost: number) {
+  if (cost > 0 && cost < 0.0001) {
+    return "<$0.0001";
+  }
+
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: cost < 0.01 ? 4 : 2,
+  }).format(cost);
+}
 
 export function MessageStats({
   message,
@@ -10,7 +23,12 @@ export function MessageStats({
   className?: string;
 }) {
   const meta = message.metadata;
-  if (!meta?.usage && !meta?.modelName && !meta?.duration) {
+  if (
+    !meta?.usage &&
+    !meta?.modelName &&
+    !meta?.duration &&
+    meta?.estimatedCost === undefined
+  ) {
     return null;
   }
 
@@ -29,7 +47,7 @@ export function MessageStats({
   return (
     <div
       className={cn(
-        "flex items-center gap-2 text-[11px] text-muted-foreground/70",
+        "flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground/70",
         className
       )}
     >
@@ -46,6 +64,13 @@ export function MessageStats({
         <span className="inline-flex items-center gap-0.5">
           <Puzzle className="text-muted-foreground/50" size={10} />
           {totalTokens} tokens
+        </span>
+      )}
+
+      {meta.estimatedCost !== undefined && (
+        <span className="inline-flex items-center gap-0.5">
+          <CircleDollarSign className="text-muted-foreground/50" size={10} />
+          Est. cost {formatEstimatedCost(meta.estimatedCost)}
         </span>
       )}
 

@@ -68,6 +68,22 @@ export type ModelPricing = {
   outputPerMillion: number;
 };
 
+export function estimateTokenCost({
+  inputTokens,
+  outputTokens,
+  pricing,
+}: {
+  inputTokens: number;
+  outputTokens: number;
+  pricing: ModelPricing;
+}) {
+  return (
+    (inputTokens * pricing.inputPerMillion +
+      outputTokens * pricing.outputPerMillion) /
+    1_000_000
+  );
+}
+
 const MAX_MODELS_TOTAL = 80;
 const MODEL_CATALOG_TIMEOUT_MS = 5000;
 const DEFAULT_PROVIDER_LIMIT = 12;
