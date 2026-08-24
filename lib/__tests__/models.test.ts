@@ -122,6 +122,7 @@ describe("provider model discovery", () => {
           description: "Gateway Kimi",
           id: "moonshotai/kimi-k2.6",
           name: "Kimi K2.6",
+          pricing: { input: "0.0000002", output: "0.0000012" },
         },
       ],
     });
@@ -132,10 +133,39 @@ describe("provider model discovery", () => {
         description: "Gateway Kimi",
         id: "moonshotai/kimi-k2.6",
         name: "Kimi K2.6",
+        pricing: { inputPerMillion: 0.2, outputPerMillion: 1.2 },
         provider: "moonshotai",
       },
     ]);
     expect(gatewayMock.getAvailableModels).toHaveBeenCalled();
+  });
+
+  it("preserves AI Gateway pricing in the combined model catalog", async () => {
+    vi.stubEnv("AI_GATEWAY_API_KEY", "vck_test");
+    vi.stubEnv("OPENAI_API_KEY", "");
+    vi.stubEnv("OPENROUTER_API_KEY", "");
+    vi.stubEnv("OPENCODE_API_KEY", "");
+    gatewayMock.getAvailableModels.mockResolvedValue({
+      models: [
+        {
+          description: "Gateway Luna",
+          id: "openai/gpt-5.6-luna",
+          name: "GPT 5.6 Luna",
+          pricing: { input: "0.0000002", output: "0.0000012" },
+        },
+      ],
+    });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      json: async () => ({ data: [] }),
+      ok: true,
+    } as Response);
+    const { fetchAllModelData } = await import("../ai/models");
+
+    const { allModels } = await fetchAllModelData();
+
+    expect(
+      allModels.find((model) => model.id === "openai/gpt-5.6-luna")?.pricing
+    ).toEqual({ inputPerMillion: 0.2, outputPerMillion: 1.2 });
   });
 
   it("falls back to public OpenRouter catalog with Gateway ids when Gateway metadata fails", async () => {

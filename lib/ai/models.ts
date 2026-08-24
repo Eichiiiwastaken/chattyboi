@@ -303,6 +303,10 @@ export async function fetchGatewayModels(): Promise<ChatModel[]> {
       name: model.name || model.id,
       provider: model.id.split("/")[0] ?? "gateway",
       description: model.description ?? "",
+      pricing: parsePerTokenPricing(
+        model.pricing?.input,
+        model.pricing?.output
+      ),
     }));
   } catch {
     return fetchPublicOpenRouterModels({ gatewayIds: true });
@@ -454,8 +458,18 @@ async function fetchOpenRouterRawData(): Promise<OpenRouterRawModel[]> {
 }
 
 function parsePricing(modelData: OpenRouterRawModel): ModelPricing | undefined {
-  const inputPerToken = Number(modelData.pricing?.prompt);
-  const outputPerToken = Number(modelData.pricing?.completion);
+  return parsePerTokenPricing(
+    modelData.pricing?.prompt,
+    modelData.pricing?.completion
+  );
+}
+
+function parsePerTokenPricing(
+  inputPerTokenValue: string | undefined,
+  outputPerTokenValue: string | undefined
+): ModelPricing | undefined {
+  const inputPerToken = Number(inputPerTokenValue);
+  const outputPerToken = Number(outputPerTokenValue);
 
   if (
     !Number.isFinite(inputPerToken) ||
@@ -466,8 +480,8 @@ function parsePricing(modelData: OpenRouterRawModel): ModelPricing | undefined {
   }
 
   return {
-    inputPerMillion: inputPerToken * 1_000_000,
-    outputPerMillion: outputPerToken * 1_000_000,
+    inputPerMillion: Number((inputPerToken * 1_000_000).toPrecision(12)),
+    outputPerMillion: Number((outputPerToken * 1_000_000).toPrecision(12)),
   };
 }
 
@@ -492,11 +506,18 @@ function pricingForModel(
 }
 
 export async function getEstimatedPricingForModelIds(modelIds: string[]) {
-  const rawModels = await fetchOpenRouterRawData();
+  const [gatewayModels, rawModels] = await Promise.all([
+    fetchGatewayModels(),
+    fetchOpenRouterRawData(),
+  ]);
 
   return Object.fromEntries(
     modelIds
-      .map((modelId) => [modelId, pricingForModel(modelId, rawModels)])
+      .map((modelId) => [
+        modelId,
+        gatewayModels.find((model) => model.id === modelId)?.pricing ??
+          pricingForModel(modelId, rawModels),
+      ])
       .filter(([, pricing]) => pricing !== undefined)
   ) as Record<string, ModelPricing>;
 }
@@ -602,7 +623,7 @@ export async function fetchAllModelData(): Promise<{
 
   const modelsWithPricing = allModels.map((model) => ({
     ...model,
-    pricing: pricingForModel(model.id, openRouterRawData),
+    pricing: model.pricing ?? pricingForModel(model.id, openRouterRawData),
   }));
 
   return {

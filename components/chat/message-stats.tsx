@@ -1,4 +1,9 @@
+"use client";
+
 import { CircleDollarSign, Puzzle, Timer, Zap } from "lucide-react";
+import useSWR from "swr";
+import { MODELS_API_PATH } from "@/lib/ai/model-api";
+import type { ChatModel } from "@/lib/ai/models";
 import type { ChatMessage } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +28,19 @@ export function MessageStats({
   className?: string;
 }) {
   const meta = message.metadata;
+  const needsCatalogPricing =
+    meta?.estimatedCost === undefined &&
+    meta?.usage !== undefined &&
+    meta?.modelId !== undefined;
+  const { data: modelsData } = useSWR(
+    needsCatalogPricing
+      ? `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}${MODELS_API_PATH}`
+      : null,
+    (url: string) =>
+      fetch(url, { cache: "no-store" }).then((res) => res.json()),
+    { revalidateOnFocus: false }
+  );
+
   if (
     !meta?.usage &&
     !meta?.modelName &&
@@ -33,7 +51,18 @@ export function MessageStats({
   }
 
   const totalTokens = meta.usage?.totalTokens ?? 0;
+  const inputTokens = meta.usage?.inputTokens ?? 0;
   const outputTokens = meta.usage?.outputTokens ?? 0;
+  const modelPricing = (modelsData?.models as ChatModel[] | undefined)?.find(
+    (model) => model.id === meta.modelId
+  )?.pricing;
+  const estimatedCost =
+    meta.estimatedCost ??
+    (modelPricing
+      ? (inputTokens * modelPricing.inputPerMillion +
+          outputTokens * modelPricing.outputPerMillion) /
+        1_000_000
+      : undefined);
   const durationMs = meta.duration ?? 0;
   const durationSec = durationMs / 1000;
   const ttfMs = meta.timeToFirstToken;
@@ -67,10 +96,10 @@ export function MessageStats({
         </span>
       )}
 
-      {meta.estimatedCost !== undefined && (
+      {estimatedCost !== undefined && (
         <span className="inline-flex items-center gap-0.5">
           <CircleDollarSign className="text-muted-foreground/50" size={10} />
-          Est. cost {formatEstimatedCost(meta.estimatedCost)}
+          Est. cost {formatEstimatedCost(estimatedCost)}
         </span>
       )}
 
