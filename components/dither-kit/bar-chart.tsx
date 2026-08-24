@@ -5,7 +5,7 @@ import { type CartesianChartProps, CartesianRoot } from "./cartesian-root";
 
 type Row = Record<string, unknown>;
 
-/** Composable dither **bar** chart — `<Bar>` series, grouped or stacked. */
+/** Composable dither bar chart with grouped or stacked `<Bar>` series. */
 export function BarChart<TData extends Row>(props: CartesianChartProps<TData>) {
   return <CartesianRoot Canvas={BarCanvas} chartType="bar" {...props} />;
 }

@@ -98,8 +98,7 @@ export function pointInPolygon(
   return inside;
 }
 
-/** Distance from a point to the nearest edge of a polygon — drives the radial
- * dither density (dense near the edge, thinning to the centre). */
+/** Return the distance from a point to the nearest polygon edge. */
 export function distToPolygonEdge(
   px: number,
   py: number,

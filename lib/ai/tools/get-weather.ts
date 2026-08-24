@@ -149,7 +149,7 @@ export async function getWeatherData(
       const geocoded = await geocodeCity(input.city, fetchImpl, signal);
       if (!geocoded) {
         return {
-          error: `Could not find coordinates for "${input.city}". Please check the city name.`,
+          error: `Could not find coordinates for "${input.city}". Check the city name.`,
         };
       }
       coordinates = geocoded;
@@ -161,7 +161,7 @@ export async function getWeatherData(
     } else {
       return {
         error:
-          "Please provide either a city name or both latitude and longitude coordinates.",
+          "Provide either a city name or both latitude and longitude coordinates.",
       };
     }
 
@@ -171,15 +171,14 @@ export async function getWeatherData(
     );
     if (!response.ok) {
       return {
-        error: `Weather service request failed (${response.status}). Please try again.`,
+        error: `Weather service request failed (${response.status}). Try again.`,
       };
     }
 
     const weatherData = weatherResponseSchema.safeParse(await response.json());
     if (!weatherData.success) {
       return {
-        error:
-          "Weather service returned an invalid response. Please try again.",
+        error: "Weather service returned an invalid response. Try again.",
       };
     }
 
@@ -192,8 +191,8 @@ export async function getWeatherData(
     }
     return {
       error: timedOut
-        ? "Weather service timed out. Please try again."
-        : "Weather service could not be reached. Please try again.",
+        ? "Weather service timed out. Try again."
+        : "Weather service could not be reached. Try again.",
     };
   } finally {
     globalThis.clearTimeout(timeout);

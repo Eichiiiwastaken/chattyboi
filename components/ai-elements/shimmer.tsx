@@ -9,7 +9,7 @@ import { memo, useMemo } from "react";
 
 type MotionHTMLProps = MotionProps & Record<string, unknown>;
 
-// Cache motion components at module level to avoid creating during render
+// Reuse motion components across renders.
 const motionComponentCache = new Map<
   keyof JSX.IntrinsicElements,
   React.ComponentType<MotionHTMLProps>

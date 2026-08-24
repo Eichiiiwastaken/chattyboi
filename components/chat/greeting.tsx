@@ -17,7 +17,8 @@ export const Greeting = () => {
         initial={{ opacity: 0, y: 10 }}
         transition={{ delay: 0.5, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
       >
-        Ask a question, write code, or explore ideas.
+        Choose a model and start typing. Turn on web search when you need
+        current sources.
       </motion.div>
     </div>
   );

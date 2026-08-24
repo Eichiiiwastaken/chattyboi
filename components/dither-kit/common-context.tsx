@@ -3,7 +3,7 @@
 import { createContext, use } from "react";
 import type { Seed } from "./palette";
 
-/** A single tooltip row — one series (cartesian/radar) or one slice (pie). */
+/** One tooltip row for a series or pie slice. */
 export type TooltipItem = {
   name: string;
   label: string;
@@ -18,13 +18,12 @@ export type TooltipItem = {
  * root. Each root publishes one of these alongside its family-specific context.
  */
 export type CommonChart = {
-  names: string[]; // legend entries — series keys (cartesian) or slice names (pie)
+  names: string[]; // series keys or pie slice names
   labelOf: (name: string) => string;
   seedOf: (name: string) => Seed;
   selectedDataKey: string | null;
   selectDataKey: (key: string | null) => void;
-  /** Transient legend-hover emphasis — spotlights one series (others dim)
-   * while the pointer rests on its legend entry. Selection still wins. */
+  /** Series under the pointer in the legend. Selection takes precedence. */
   focusDataKey: string | null;
   setFocusDataKey: (key: string | null) => void;
   hoverIndex: number | null;
@@ -32,7 +31,7 @@ export type CommonChart = {
   itemsAt: (index: number) => TooltipItem[];
   ready: boolean;
   tooltipLeft: number; // clamped px for the floating tooltip
-  tooltipTop: number; // px — follows the hovered node (cartesian) / cursor (polar)
+  tooltipTop: number; // pixels from the top edge
 };
 
 export const CommonChartContext = createContext<CommonChart | null>(null);

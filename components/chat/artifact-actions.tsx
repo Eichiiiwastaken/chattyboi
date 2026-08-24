@@ -31,7 +31,7 @@ function PureArtifactActions({
   );
 
   if (!artifactDefinition) {
-    throw new Error("Artifact definition not found!");
+    throw new Error("Artifact definition not found");
   }
 
   const actionContext: ArtifactActionContext = {

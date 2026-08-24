@@ -1,4 +1,4 @@
-# GitHub Secrets
+# GitHub secrets
 
 No manual GitHub Secrets are required.
 

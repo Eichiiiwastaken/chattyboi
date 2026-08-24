@@ -1,4 +1,4 @@
-# Deployment Setup
+# Deployment setup
 
 ## Chat rate limits
 
@@ -10,9 +10,9 @@
 
 ## GitHub Container Registry (GHCR)
 
-Images are built by GitHub Actions on push to `main` and published to `ghcr.io/<owner>/chattyboi`.
+When code reaches `main`, GitHub Actions builds the image and publishes it to `ghcr.io/<owner>/chattyboi`.
 
-### Server Setup
+### Server setup
 
 1. **Create a GitHub PAT** at [github.com/settings/tokens](https://github.com/settings/tokens) with `read:packages` scope.
 
@@ -41,20 +41,19 @@ Images are built by GitHub Actions on push to `main` and published to `ghcr.io/<
    docker image prune -f
    ```
 
-### Container Runtime
+### Container runtime
 
-The supplied Compose service uses a read-only root filesystem and runs the
-application as UID/GID `10001`. It keeps only `/tmp` and `/app/.next/cache`
-writable as temporary filesystems, while `/app/uploads` remains backed by the
-persistent `uploads` volume.
+The Compose service uses a read-only root filesystem and runs the application
+as UID/GID `10001`. It mounts `/tmp` and `/app/.next/cache` as writable temporary
+filesystems. The persistent `uploads` volume backs `/app/uploads`.
 
-The image entrypoint may recursively repair the uploads volume ownership during
-the first start after upgrading from an older root-running image. It then drops
-privileges before migrations and the Next.js server start. Do not remove the
-`CHOWN`, `SETGID`, or `SETUID` capabilities unless the volume has already been
-prepared for UID/GID `10001` and the entrypoint is changed accordingly.
+After an upgrade from an older root-running image, the entrypoint may repair
+ownership throughout the uploads volume. It then drops privileges before it
+runs migrations and starts Next.js. Keep the `CHOWN`, `SETGID`, and `SETUID`
+capabilities unless you have prepared the volume for UID/GID `10001` and changed
+the entrypoint to match.
 
-### Optional: Deploy Alias
+### Optional deploy alias
 
 Add to `~/.bashrc`:
 ```bash

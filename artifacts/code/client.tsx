@@ -69,7 +69,7 @@ type Metadata = {
 export const codeArtifact = new Artifact<"code", Metadata>({
   kind: "code",
   description:
-    "Useful for code generation; Code execution is only available for python code.",
+    "Creates code artifacts. The Run action executes Python in the browser.",
   initialize: ({ setMetadata }) => {
     setMetadata({
       outputs: [],
@@ -216,7 +216,7 @@ export const codeArtifact = new Artifact<"code", Metadata>({
     },
     {
       icon: <UndoIcon size={18} />,
-      description: "View Previous version",
+      description: "View previous version",
       onClick: ({ handleVersionChange }) => {
         handleVersionChange("prev");
       },
@@ -230,7 +230,7 @@ export const codeArtifact = new Artifact<"code", Metadata>({
     },
     {
       icon: <RedoIcon size={18} />,
-      description: "View Next version",
+      description: "View next version",
       onClick: ({ handleVersionChange }) => {
         handleVersionChange("next");
       },
@@ -247,7 +247,7 @@ export const codeArtifact = new Artifact<"code", Metadata>({
       description: "Copy code to clipboard",
       onClick: ({ content }) => {
         navigator.clipboard.writeText(content);
-        toast.success("Copied to clipboard!");
+        toast.success("Copied to clipboard");
       },
     },
   ],
@@ -261,7 +261,7 @@ export const codeArtifact = new Artifact<"code", Metadata>({
           parts: [
             {
               type: "text",
-              text: "Add comments to the code snippet for understanding",
+              text: "Comment only the code whose purpose is not obvious.",
             },
           ],
         });
@@ -276,7 +276,7 @@ export const codeArtifact = new Artifact<"code", Metadata>({
           parts: [
             {
               type: "text",
-              text: "Add logs to the code snippet for debugging",
+              text: "Add logs around the inputs and outputs of the failing path.",
             },
           ],
         });

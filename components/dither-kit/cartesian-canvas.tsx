@@ -26,11 +26,9 @@ type LoopArgs = {
 };
 
 /**
- * The requestAnimationFrame paint loop — eases each series toward its target
- * surface, paints the dither fill (with the entrance reveal), then layers the
- * crosshair marker and winking stars on top. Lives outside the component so the
- * component stays small and the closure is free of compiler constraints.
- * Returns a cleanup that cancels the loop.
+ * Paint with requestAnimationFrame while each series moves toward its target.
+ * The loop stays outside the component to avoid compiler constraints. The
+ * returned cleanup cancels the loop.
  */
 function startCartesianLoop({
   canvas,
@@ -217,8 +215,7 @@ function startCartesianLoop({
       tick += 1;
     }
 
-    // Reveal front (left-to-right) — stars + crosshair stay behind it so
-    // they don't float over the not-yet-drawn area during the entrance.
+    // Keep stars and the crosshair behind the left-to-right reveal edge.
     const reveal = animate ? easeInOutCubic(prog) : 1;
     const revealCols = reveal * cols;
 
@@ -241,8 +238,7 @@ function startCartesianLoop({
         }
         const seed = s.seedOf(key);
         const my = Math.round(cur.top[mx] ?? 0);
-        // Full-height column + a chunky marker block at the point — the
-        // series colour at higher opacity, so it reads on either theme.
+        // Draw a full-height column and a marker block at the point.
         c.fillStyle = rgb(seed.fill, 1, 0.55);
         for (let y = my; y < rows; y++) {
           c.fillRect(mx, y, 1, 1);
@@ -271,9 +267,8 @@ function startCartesianLoop({
       if (lift < 0.55 || sy < 0 || sy >= rows) {
         continue;
       }
-      // Sparkles glint in the series colour via opacity (the `lift` wink)
-      // rather than a lighter shade — so they never read as stray white
-      // pixels on a light background.
+      // Change sparkle opacity instead of colour to avoid white pixels on light
+      // backgrounds.
       const starColor = s.seedOf(star.key).fill;
       c.fillStyle = rgb(starColor, 1, lift);
       c.fillRect(sx, sy, 1, 1);

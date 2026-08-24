@@ -93,12 +93,12 @@ function CartesianSeries({
 
 export type AreaProps = SeriesProps;
 
-/** One area series — dithered fill from the value line down to its floor. */
+/** Render one area series with a dithered fill. */
 export function Area(props: AreaProps) {
   return <CartesianSeries kind="area" part="Area" {...props} />;
 }
 
-/** One line series — bright line with a thin dither glow hugging it. */
+/** Render one line series with a dither glow. */
 export function Line(props: AreaProps) {
   return <CartesianSeries kind="line" part="Line" {...props} />;
 }

@@ -39,4 +39,20 @@ describe("getCurrentDateTimePrompt", () => {
     expect(prompt).toContain("inline Markdown links");
     expect(prompt).toContain("untrusted evidence");
   });
+
+  it("sets a plain-language style for prose", () => {
+    const prompt = systemPrompt({
+      requestHints: {
+        city: "Berlin",
+        country: "DE",
+        latitude: "52.52",
+        longitude: "13.40",
+        timezone: "Europe/Berlin",
+      },
+    });
+
+    expect(prompt).toContain("use plain language and concrete details");
+    expect(prompt).toContain("Preserve the user's tone");
+    expect(prompt).toContain("Use sentence-case headings");
+  });
 });

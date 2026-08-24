@@ -11,7 +11,7 @@ export const textDocumentHandler = createDocumentHandler<"text">({
     const { fullStream } = streamText({
       model: getLanguageModel(modelId),
       system:
-        "Write about the given topic. Markdown is supported. Use headings wherever appropriate.",
+        "Draft the requested text. Match any tone, audience, or format named in the request. Use plain language and concrete details. Add Markdown headings only when they make the document easier to scan.",
       experimental_transform: smoothStream({ chunking: "word" }),
       prompt: title,
     });

@@ -26,12 +26,12 @@ export default function Page() {
     if (state.status === "failed" || state.status === "error") {
       toast({
         type: "error",
-        description: state.message ?? "Invalid credentials!",
+        description: state.message ?? "Invalid username or password.",
       });
     } else if (state.status === "invalid_data") {
       toast({
         type: "error",
-        description: state.message ?? "Failed validating your submission!",
+        description: state.message ?? "Check the username and password fields.",
       });
     } else if (state.status === "success") {
       setIsSuccessful(true);

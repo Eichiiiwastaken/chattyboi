@@ -48,7 +48,7 @@ describe("ChatbotError", () => {
     expect(err2.message).toContain("limit");
 
     const err3 = new ChatbotError("offline:chat");
-    expect(err3.message).toContain("trouble");
+    expect(err3.message).toContain("couldn't send");
 
     const err4 = new ChatbotError("not_found:chat");
     expect(err4.message).toContain("not found");
@@ -56,9 +56,7 @@ describe("ChatbotError", () => {
 
   it("handles database errors with generic message", () => {
     const err = new ChatbotError("offline:database");
-    expect(err.message).toBe(
-      "An error occurred while executing a database query."
-    );
+    expect(err.message).toBe("The database query failed.");
   });
 
   it("toResponse returns a JSON Response with correct status code", () => {
@@ -73,14 +71,14 @@ describe("ChatbotError", () => {
     const response = err.toResponse();
     const json = await response.json();
     expect(json.code).toBe("");
-    expect(json.message).toContain("try again");
+    expect(json.message).toContain("Try again");
   });
 });
 
 describe("getMessageByErrorCode", () => {
   it("returns known messages", () => {
     expect(getMessageByErrorCode("bad_request:api")).toContain(
-      "couldn't be processed"
+      "couldn't process"
     );
     expect(getMessageByErrorCode("unauthorized:auth")).toContain("sign in");
     expect(getMessageByErrorCode("forbidden:chat")).toContain(
@@ -90,7 +88,7 @@ describe("getMessageByErrorCode", () => {
 
   it("returns default message for unknown codes", () => {
     const msg = getMessageByErrorCode("unknown:surface" as never);
-    expect(msg).toBe("Something went wrong. Please try again later.");
+    expect(msg).toBe("We couldn't complete that request. Try again.");
   });
 });
 

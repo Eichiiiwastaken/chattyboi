@@ -4,7 +4,8 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "chattyboi",
     short_name: "chattyboi",
-    description: "chattyboi chatbot using the AI SDK.",
+    description:
+      "Self-hosted AI chat with model switching, web search, and editable artifacts.",
     start_url: "/",
     scope: "/",
     display: "standalone",

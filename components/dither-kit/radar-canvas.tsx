@@ -14,11 +14,9 @@ import { distToPolygonEdge, pointInPolygon, polarX, polarY } from "./polar";
 import { usePolarChart } from "./polar-context";
 
 /**
- * Dither canvas for radar charts. Each series is a closed polygon over the
- * spokes (value → radius per axis). Backing pixels inside a polygon are filled
- * with the ordered-dither scatter — dense near the polygon edge, thinning toward
- * the centre — and each vertex is marked with a bright dot (larger on the hovered
- * axis). The polygons scale in from the centre on mount.
+ * Paint each radar series as a closed polygon. The dither becomes sparser toward
+ * the centre, and the marker on the hovered axis grows. Polygons scale outward
+ * from the centre on mount.
  */
 export function RadarCanvas() {
   const ctx = usePolarChart();
@@ -103,9 +101,7 @@ export function RadarCanvas() {
         const py = ((y + 0.5) * height) / rows;
         for (let x = 0; x < cols; x++) {
           const px = ((x + 0.5) * width) / cols;
-          // Whether a layer behind already coloured this pixel — front layers
-          // then keep true gaps in their dither so the back layer shows
-          // through, instead of tinting the overlap into a muddy blend.
+          // Front layers leave gaps where a back layer already coloured a pixel.
           let covered = false;
           for (let pi = 0; pi < polys.length; pi++) {
             const { key, poly } = polys[pi];
@@ -149,7 +145,7 @@ export function RadarCanvas() {
         }
       }
 
-      // Vertex markers — larger on the hovered axis.
+      // Enlarge the marker on the hovered axis.
       for (const { key, pts } of polys) {
         const seed = s.seedOf(key);
         const emphasis = s.selectedDataKey ?? s.focusDataKey;

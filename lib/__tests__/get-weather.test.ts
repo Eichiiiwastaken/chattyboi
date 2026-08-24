@@ -118,7 +118,7 @@ describe("getWeatherData", () => {
         { fetchImpl, timeoutMs: 1000 }
       )
     ).resolves.toEqual({
-      error: "Weather service request failed (503). Please try again.",
+      error: "Weather service request failed (503). Try again.",
     });
   });
 
@@ -133,7 +133,7 @@ describe("getWeatherData", () => {
         { fetchImpl, timeoutMs: 1000 }
       )
     ).resolves.toEqual({
-      error: "Weather service could not be reached. Please try again.",
+      error: "Weather service could not be reached. Try again.",
     });
   });
 
@@ -148,7 +148,7 @@ describe("getWeatherData", () => {
         { fetchImpl, timeoutMs: 1000 }
       )
     ).resolves.toEqual({
-      error: "Weather service returned an invalid response. Please try again.",
+      error: "Weather service returned an invalid response. Try again.",
     });
   });
 
@@ -170,7 +170,7 @@ describe("getWeatherData", () => {
         { fetchImpl, timeoutMs: 10 }
       )
     ).resolves.toEqual({
-      error: "Weather service timed out. Please try again.",
+      error: "Weather service timed out. Try again.",
     });
   });
 

@@ -13,8 +13,7 @@ import {
 
 type Bars = { top: number[]; base: number[] }; // per data index, in backing rows
 
-// Fraction of the timeline spent staggering bar starts — the rest is each bar's
-// own grow window, so the rise sweeps across the chart as a wave.
+// Reserve this fraction of the timeline for staggered starts.
 const STAGGER = 0.55;
 
 /**

@@ -23,15 +23,15 @@
 - Web search and multi-pass deep research with Exa or Tavily, including
   extracted source content and inline citations
 
-## Model Providers
+## Model providers
 
-This template uses the [Vercel AI Gateway](https://vercel.com/docs/ai-gateway) to access multiple AI models through a unified interface. Models are configured in `lib/ai/models.ts` with per-model provider routing. Included models: Mistral, Moonshot, DeepSeek, OpenAI, and xAI.
+chattyboi uses the [Vercel AI Gateway](https://vercel.com/docs/ai-gateway) to access several AI models through one interface. `lib/ai/models.ts` defines the models and their provider routes. The default list includes Mistral, Moonshot, DeepSeek, OpenAI, and xAI.
 
-Additional providers (OpenCodeGo, OpenRouter) are configured directly in `lib/ai/providers.ts`.
+`lib/ai/providers.ts` configures OpenCodeGo and OpenRouter directly.
 
 ## Deployment
 
-chattyboi is deployed via **Docker Compose**. Images are built automatically by **GitHub Actions** and pushed to **GitHub Container Registry (GHCR)**.
+Docker Compose runs chattyboi. GitHub Actions builds the image and pushes it to GitHub Container Registry.
 
 ### Prerequisites
 
@@ -45,7 +45,7 @@ chattyboi is deployed via **Docker Compose**. Images are built automatically by 
 
 **2. Run the GitHub Actions workflow**
 
-Pushing to `main` triggers `.github/workflows/deploy.yml`, which builds a multi-arch Docker image and pushes it to GHCR. No GitHub Secrets configuration is needed — the workflow uses the built-in `GITHUB_TOKEN`.
+Pushing to `main` triggers `.github/workflows/deploy.yml`. The workflow builds a multi-architecture Docker image and pushes it to GHCR with the built-in `GITHUB_TOKEN`. You do not need to configure a separate GitHub Actions secret.
 
 **3. Create your environment file**
 
@@ -102,7 +102,7 @@ docker compose up -d
 docker image prune -f
 ```
 
-### Local Docker Build
+### Local Docker build
 
 To build the app image from your local checkout instead of pulling from GHCR:
 
@@ -112,14 +112,15 @@ docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
 
 ### Container security and uploads
 
-The app container runs its long-lived processes as UID/GID `10001`, with a
-read-only root filesystem, no-new-privileges, and only the capabilities needed
-to initialize the uploads volume and drop privileges. Runtime scratch data is
-kept in the Compose-managed `tmpfs` mounts for `/tmp` and
-`/app/.next/cache`; uploaded files are persisted in the `uploads` named volume.
+The app container runs its long-lived processes as UID/GID `10001`. It uses a
+read-only root filesystem and enables `no-new-privileges`. The container keeps
+only the capabilities needed to initialize the uploads volume and drop
+privileges. Compose mounts `/tmp` and `/app/.next/cache` as `tmpfs` storage and
+stores uploaded files in the `uploads` volume.
 
 On startup, the entrypoint repairs ownership of an existing uploads volume when
 needed, then starts the migration and app processes as the unprivileged `app`
 user. The first start after upgrading an older root-running deployment may take
-longer while that one-time ownership migration runs. Keep `/app/uploads`
-writable and persistent if you customize the Compose configuration.
+longer because the entrypoint must migrate the existing ownership. Keep
+`/app/uploads` writable and persistent if you customize the Compose
+configuration.

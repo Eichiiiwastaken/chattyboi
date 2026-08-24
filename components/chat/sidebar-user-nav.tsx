@@ -97,7 +97,7 @@ export function SidebarUserNav({ user }: { user: User }) {
                     toast({
                       type: "error",
                       description:
-                        "Checking authentication status, please try again!",
+                        "Still checking your sign-in status. Try again in a moment.",
                     });
 
                     return;

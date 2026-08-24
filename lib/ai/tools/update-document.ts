@@ -70,8 +70,8 @@ export const updateDocument = ({
         kind: document.kind,
         content:
           document.kind === "code"
-            ? "The script has been updated successfully."
-            : "The document has been updated successfully.",
+            ? "Updated the script."
+            : "Updated the document.",
       };
     },
   });

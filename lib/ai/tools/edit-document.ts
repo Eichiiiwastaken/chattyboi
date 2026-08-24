@@ -93,8 +93,8 @@ export const editDocument = ({ session, dataStream }: EditDocumentProps) =>
         kind: document.kind,
         content:
           document.kind === "code"
-            ? "The script has been edited successfully."
-            : "The document has been edited successfully.",
+            ? "Edited the script."
+            : "Edited the document.",
       };
     },
   });

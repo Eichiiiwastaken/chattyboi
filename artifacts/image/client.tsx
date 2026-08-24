@@ -5,7 +5,7 @@ import { ImageEditor } from "@/components/chat/image-editor";
 
 export const imageArtifact = new Artifact({
   kind: "image",
-  description: "Useful for image generation",
+  description: "Generates a PNG image from a text prompt.",
   onStreamPart: ({ streamPart, setArtifact }) => {
     if (streamPart.type === "data-imageDelta") {
       setArtifact((draftArtifact) => ({
@@ -20,7 +20,7 @@ export const imageArtifact = new Artifact({
   actions: [
     {
       icon: <UndoIcon size={18} />,
-      description: "View Previous version",
+      description: "View previous version",
       onClick: ({ handleVersionChange }) => {
         handleVersionChange("prev");
       },
@@ -34,7 +34,7 @@ export const imageArtifact = new Artifact({
     },
     {
       icon: <RedoIcon size={18} />,
-      description: "View Next version",
+      description: "View next version",
       onClick: ({ handleVersionChange }) => {
         handleVersionChange("next");
       },
@@ -68,7 +68,7 @@ export const imageArtifact = new Artifact({
           }, "image/png");
         };
 
-        toast.success("Copied image to clipboard!");
+        toast.success("Copied image to clipboard");
       },
     },
   ],

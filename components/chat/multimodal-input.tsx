@@ -377,7 +377,7 @@ function PureMultimodalInput({
       toast.error(error);
     } catch (error) {
       console.error("Failed to upload file:", error);
-      toast.error("Failed to upload file, please try again!");
+      toast.error("The upload failed. Try again.");
     }
   }, []);
 

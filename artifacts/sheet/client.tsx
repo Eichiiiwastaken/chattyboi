@@ -14,7 +14,7 @@ type Metadata = Record<string, never>;
 
 export const sheetArtifact = new Artifact<"sheet", Metadata>({
   kind: "sheet",
-  description: "Useful for working with spreadsheets",
+  description: "Creates and edits CSV spreadsheets.",
   initialize: () => null,
   onStreamPart: ({ setArtifact, streamPart }) => {
     if (streamPart.type === "data-sheetDelta") {
@@ -40,7 +40,7 @@ export const sheetArtifact = new Artifact<"sheet", Metadata>({
   actions: [
     {
       icon: <UndoIcon size={18} />,
-      description: "View Previous version",
+      description: "View previous version",
       onClick: ({ handleVersionChange }) => {
         handleVersionChange("prev");
       },
@@ -54,7 +54,7 @@ export const sheetArtifact = new Artifact<"sheet", Metadata>({
     },
     {
       icon: <RedoIcon size={18} />,
-      description: "View Next version",
+      description: "View next version",
       onClick: ({ handleVersionChange }) => {
         handleVersionChange("next");
       },
@@ -79,7 +79,7 @@ export const sheetArtifact = new Artifact<"sheet", Metadata>({
         const cleanedCsv = unparse(nonEmptyRows);
 
         navigator.clipboard.writeText(cleanedCsv);
-        toast.success("Copied csv to clipboard!");
+        toast.success("Copied CSV to clipboard");
       },
     },
   ],
@@ -91,7 +91,10 @@ export const sheetArtifact = new Artifact<"sheet", Metadata>({
         sendMessage({
           role: "user",
           parts: [
-            { type: "text", text: "Can you please format and clean the data?" },
+            {
+              type: "text",
+              text: "Normalize the CSV headers, dates, numbers, and empty rows.",
+            },
           ],
         });
       },
@@ -105,7 +108,7 @@ export const sheetArtifact = new Artifact<"sheet", Metadata>({
           parts: [
             {
               type: "text",
-              text: "Can you please analyze and visualize the data by creating a new code artifact in python?",
+              text: "Analyze this spreadsheet and create a Python code artifact with the most useful chart. Explain the main finding.",
             },
           ],
         });

@@ -18,11 +18,9 @@ const TAU = Math.PI * 2;
 const POP = 6; // px the hovered slice bulges outward
 
 /**
- * Dither canvas for pie / donut charts. Each backing pixel is mapped back to
- * plot space, tested for its slice by angle, and filled with the ordered-dither
- * scatter — dense at the outer edge, thinning toward the centre — capped by a
- * bright arc on the rim. The pie sweeps in clockwise on mount; the hovered slice
- * bulges outward with a brighter rim while the rest dim.
+ * Paint pie and donut charts one backing pixel at a time. The dither becomes
+ * sparser toward the centre. The chart sweeps clockwise on mount, and the
+ * hovered slice moves outward while the others dim.
  */
 export function PieCanvas() {
   const ctx = usePolarChart();
@@ -121,7 +119,7 @@ export function PieCanvas() {
           const selDim = emphasis !== null && emphasis !== slice.name ? 0.3 : 1;
           const it = intensity + (active ? 0.4 * popEase : 0);
 
-          // Bright rim on the outer edge — thicker on the hovered slice.
+          // Thicken the outer rim on the hovered slice.
           if (localOuter - r < (active ? 1.4 + popEase : 1.4)) {
             c.fillStyle = rgb(seed.fill, 1, selDim);
             c.fillRect(x, y, 1, 1);

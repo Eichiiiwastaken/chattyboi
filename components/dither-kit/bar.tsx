@@ -17,10 +17,8 @@ export type BarProps = {
 };
 
 /**
- * One bar series. The dithered bars are painted on the canvas; this registers
- * the series and (when `isClickable`) lays transparent hit rects over each bar
- * — using the shared `barSlot` geometry so clicks line up with the pixels — to
- * select the series. The Legend offers the same toggle accessibly.
+ * Register one bar series. When `isClickable` is true, transparent hit targets
+ * use the same `barSlot` geometry as the rendered bars.
  */
 export function Bar({
   dataKey,

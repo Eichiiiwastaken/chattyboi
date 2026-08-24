@@ -49,7 +49,7 @@ export const requestSuggestions = ({
       const { partialOutputStream } = streamText({
         model: getLanguageModel(modelId),
         system:
-          "You are a writing assistant. Given a piece of writing, offer up to 5 suggestions to improve it. Each suggestion must contain full sentences, not just individual words. Describe what changed and why.",
+          "Review the draft and return up to five changes that make it clearer or better suited to its audience. Preserve the author's voice. Each suggestion must replace a complete sentence and explain why the change helps. Do not rewrite sentences that already work.",
         prompt: document.content,
         output: Output.array({
           element: z.object({
@@ -115,7 +115,7 @@ export const requestSuggestions = ({
         id: documentId,
         title: document.title,
         kind: document.kind,
-        message: "Suggestions have been added to the document",
+        message: "Added suggestions to the document",
       };
     },
   });

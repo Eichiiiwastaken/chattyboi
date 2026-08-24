@@ -12,7 +12,8 @@ const DARK_THEME_COLOR = "hsl(240deg 10% 3.92%)";
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXTAUTH_URL ?? "http://localhost:3232"),
   title: "chattyboi",
-  description: "chattyboi chatbot using the AI SDK.",
+  description:
+    "Self-hosted AI chat with model switching, web search, and editable artifacts.",
   manifest: "/manifest.webmanifest",
 };
 

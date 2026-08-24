@@ -17,7 +17,7 @@ import {
 } from "./scales";
 import type { Dimensions } from "./use-chart-dimensions";
 
-/** Which chart root a part is composed under — drives the boundary guards. */
+/** Chart root used by the boundary guards. */
 export type ChartType = "area" | "bar" | "line" | "pie" | "radar";
 
 export type ChartConfig = Record<
@@ -50,7 +50,7 @@ export type SeriesSpec = {
 export type ChartContextValue = {
   chartType: ChartType; // which root this part is under
   config: ChartConfig;
-  configKeys: string[]; // series order — drives stacking + legend
+  configKeys: string[]; // series order for stacking and the legend
   data: Row[];
   dataLength: number;
   stackType: StackType;
@@ -62,7 +62,7 @@ export type ChartContextValue = {
   xCenter: (index: number) => number; // category centre px within the plot
   bandwidth: number; // category slot width (0 for point/area scales)
   indexAtX: (px: number) => number; // nearest category for a pointer x
-  // Bar geometry in plot px — one source of truth for the canvas + click rects.
+  // Shared bar geometry for the canvas and click targets.
   barSlot: (
     index: number,
     seriesIndex: number,
@@ -75,7 +75,7 @@ export type ChartContextValue = {
   // Interaction state, shared by every part.
   selectedDataKey: string | null;
   selectDataKey: (key: string | null) => void;
-  /** Legend-hover spotlight — dims every series but this one while set. */
+  /** Series under the pointer in the legend. */
   focusDataKey: string | null;
   setFocusDataKey: (key: string | null) => void;
   hoverIndex: number | null;
@@ -85,7 +85,7 @@ export type ChartContextValue = {
   setCursorX: (px: number) => void;
   isMouseInChart: boolean;
   setMouseInChart: (over: boolean) => void;
-  hovered: boolean; // parent-driven hover (e.g. the whole card) — lifts the fill
+  hovered: boolean; // parent-controlled hover state
   bloom: BloomInput; // glow on the dither canvas
   bloomOnHover: boolean; // only bloom while hovered
 
@@ -99,7 +99,7 @@ export type ChartContextValue = {
   animate: boolean;
   animationDuration: number;
   revision: number;
-  entranceDone: boolean; // true once the entrance has played — gates SVG markers
+  entranceDone: boolean; // gates SVG markers until the entrance ends
   markEntranceDone: () => void; // the canvas calls this when its reveal completes
 
   // Helpers.
@@ -129,9 +129,9 @@ export function useChart() {
 }
 
 /**
- * Boundary guard for a composable part. Throws a precise error when used outside
- * a root, or inside the wrong chart type — e.g. `<Bar />` placed in an area
- * chart. `kind` omitted means the part works under any root (grid, axes, …).
+ * Boundary guard for a composable part. Throws when used outside a root or
+ * inside the wrong chart type. If `kind` is absent, the part works under any
+ * chart root.
  */
 export function useChartPart(
   part: string,
@@ -148,7 +148,7 @@ export function useChartPart(
     const allowed = Array.isArray(kind) ? kind : [kind];
     if (!allowed.includes(ctx.chartType)) {
       throw new Error(
-        `<${part} /> is not valid inside ${ROOT_OF[ctx.chartType]} — it belongs in ${allowed
+        `<${part} /> is not valid inside ${ROOT_OF[ctx.chartType]}. It belongs in ${allowed
           .map((k) => ROOT_OF[k])
           .join(" or ")}.`
       );
@@ -159,10 +159,11 @@ export function useChartPart(
 
 export { ChartContext };
 
-/** A counter that advances whenever `data` changes identity or `token` advances
- * — drives entrance replays without remounting. Uses the adjust-state-during-
- * render pattern (https://react.dev/reference/react/useState) instead of refs,
- * so React Compiler can reason about it. */
+/**
+ * Advance a counter when `data` changes identity or `token` advances. This
+ * replays the entrance without remounting and keeps the state visible to React
+ * Compiler.
+ */
 export function useRevision(data: unknown, token: number) {
   const [prev, setPrev] = useState({ data, token, revision: 0 });
   if (prev.data !== data || prev.token !== token) {
@@ -211,8 +212,7 @@ export function useChartController({
   defaultSelectedDataKey?: string | null;
   onSelectionChange?: (key: string | null) => void;
 }): ChartContextValue {
-  // React Compiler memoizes every render-scope value below — no manual
-  // useMemo/useCallback wrappers needed.
+  // React Compiler memoizes the render-scope values below.
   const configKeys = Object.keys(config);
   const revision = useRevision(data, replayToken);
 

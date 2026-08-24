@@ -73,7 +73,7 @@ export class ChatbotError extends Error {
       });
 
       return Response.json(
-        { code: "", message: "Something went wrong. Please try again later." },
+        { code: "", message: "We couldn't complete that request. Try again." },
         { status: statusCode }
       );
     }
@@ -117,7 +117,7 @@ function normalizeErrorText(value: unknown): string | undefined {
 
 export function getErrorMessageFromUnknown(
   error: unknown,
-  fallback = "Something went wrong. Please try again later."
+  fallback = "We couldn't complete that request. Try again."
 ): NormalizedError {
   if (error instanceof ChatbotError) {
     return {
@@ -150,15 +150,15 @@ export function getErrorMessageFromUnknown(
 
 export function getMessageByErrorCode(errorCode: ErrorCode): string {
   if (errorCode.includes("database")) {
-    return "An error occurred while executing a database query.";
+    return "The database query failed.";
   }
 
   switch (errorCode) {
     case "bad_request:api":
-      return "The request couldn't be processed. Please check your input and try again.";
+      return "We couldn't process the request. Check your input and try again.";
 
     case "bad_request:activate_gateway":
-      return "AI Gateway requires a valid credit card on file to service requests. Please visit https://vercel.com/d?to=%2F%5Bteam%5D%2F%7E%2Fai%3Fmodal%3Dadd-credit-card to add a card and unlock your free credits.";
+      return "Vercel AI Gateway needs a payment card before it can handle requests. Add one at https://vercel.com/d?to=%2F%5Bteam%5D%2F%7E%2Fai%3Fmodal%3Dadd-credit-card.";
 
     case "unauthorized:auth":
       return "You need to sign in before continuing.";
@@ -166,7 +166,7 @@ export function getMessageByErrorCode(errorCode: ErrorCode): string {
       return "Your account does not have access to this feature.";
 
     case "rate_limit:chat":
-      return "You've reached the message limit. Come back in 1 hour to continue chatting.";
+      return "You've reached the message limit. Try again in one hour.";
     case "bad_request:chat":
       return "The selected model provider is not configured. Please update your deployment environment and try again.";
     case "not_found:chat":
@@ -176,7 +176,7 @@ export function getMessageByErrorCode(errorCode: ErrorCode): string {
     case "unauthorized:chat":
       return "You need to sign in to view this chat. Please sign in and try again.";
     case "offline:chat":
-      return "We're having trouble sending your message. Please check your internet connection and try again.";
+      return "We couldn't send your message. Check your internet connection and try again.";
 
     case "not_found:document":
       return "The requested document was not found. Please check the document ID and try again.";
@@ -190,10 +190,10 @@ export function getMessageByErrorCode(errorCode: ErrorCode): string {
     case "unauthorized:settings":
       return "You need to sign in to view or update settings.";
     case "offline:settings":
-      return "We're having trouble loading your settings. Please check your connection and try again.";
+      return "We couldn't load your settings. Check your connection and try again.";
 
     default:
-      return "Something went wrong. Please try again later.";
+      return "We couldn't complete that request. Try again.";
   }
 }
 

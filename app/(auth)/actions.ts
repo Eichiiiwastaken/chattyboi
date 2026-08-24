@@ -42,7 +42,7 @@ export const login = async (
     if (error instanceof z.ZodError) {
       return {
         status: "invalid_data",
-        message: "Failed validating your submission!",
+        message: "Check the username and password fields.",
       };
     }
 
@@ -51,7 +51,7 @@ export const login = async (
       if (error.type === "CredentialsSignin") {
         return {
           status: "failed",
-          message: "Invalid credentials!",
+          message: "Invalid username or password.",
         };
       }
       return { status: "failed", message: error.message };
@@ -63,7 +63,7 @@ export const login = async (
       message:
         error instanceof Error
           ? error.message
-          : "Something went wrong. Please try again.",
+          : "We couldn't sign you in. Try again.",
     };
   }
 };

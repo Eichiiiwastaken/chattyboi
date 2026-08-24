@@ -301,7 +301,7 @@ export default function SettingsPage() {
                         await copyToClipboard(
                           `${window.location.origin}/?q=%s`
                         );
-                        toast.success("Copied to clipboard!");
+                        toast.success("Copied to clipboard");
                       }}
                       size="icon-xs"
                       variant="ghost"
@@ -321,7 +321,7 @@ export default function SettingsPage() {
                         await copyToClipboard(
                           `${window.location.origin}/?q=%s&search=true`
                         );
-                        toast.success("Copied to clipboard!");
+                        toast.success("Copied to clipboard");
                       }}
                       size="icon-xs"
                       variant="ghost"
@@ -341,7 +341,7 @@ export default function SettingsPage() {
                         await copyToClipboard(
                           `${window.location.origin}/?q=%s&research=deep`
                         );
-                        toast.success("Copied to clipboard!");
+                        toast.success("Copied to clipboard");
                       }}
                       size="icon-xs"
                       variant="ghost"

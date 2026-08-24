@@ -90,7 +90,7 @@ export function limitChatFiles({
     const size = fileSizes.get(part.url);
     if (size == null) {
       throw new ChatContextLimitError(
-        `I couldn't read the attachment “${part.filename ?? "file"}”. Please remove it, upload it again, and retry.`
+        `I couldn't read the attachment "${part.filename ?? "file"}". Remove it, upload it again, and retry.`
       );
     }
     newestFileBytes += size;

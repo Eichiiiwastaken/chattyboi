@@ -12,7 +12,7 @@ export function AreaChart<TData extends Row>(
   return <CartesianRoot Canvas={CartesianCanvas} chartType="area" {...props} />;
 }
 
-/** Composable dither **line** chart — `<Line>` series with a glow under the line. */
+/** Composable dither line chart with `<Line>` series. */
 export function LineChart<TData extends Row>(
   props: CartesianChartProps<TData>
 ) {

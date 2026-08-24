@@ -20,7 +20,7 @@ type TextArtifactMetadata = {
 
 export const textArtifact = new Artifact<"text", TextArtifactMetadata>({
   kind: "text",
-  description: "Useful for text content, like drafting essays and emails.",
+  description: "Creates and edits long-form text such as essays or emails.",
   initialize: async ({ documentId, setMetadata }) => {
     const suggestions = await getSuggestions({ documentId });
 
@@ -116,7 +116,7 @@ export const textArtifact = new Artifact<"text", TextArtifactMetadata>({
     },
     {
       icon: <UndoIcon size={18} />,
-      description: "View Previous version",
+      description: "View previous version",
       onClick: ({ handleVersionChange }) => {
         handleVersionChange("prev");
       },
@@ -130,7 +130,7 @@ export const textArtifact = new Artifact<"text", TextArtifactMetadata>({
     },
     {
       icon: <RedoIcon size={18} />,
-      description: "View Next version",
+      description: "View next version",
       onClick: ({ handleVersionChange }) => {
         handleVersionChange("next");
       },
@@ -147,21 +147,21 @@ export const textArtifact = new Artifact<"text", TextArtifactMetadata>({
       description: "Copy to clipboard",
       onClick: ({ content }) => {
         navigator.clipboard.writeText(content);
-        toast.success("Copied to clipboard!");
+        toast.success("Copied to clipboard");
       },
     },
   ],
   toolbar: [
     {
       icon: <PenIcon />,
-      description: "Add final polish",
+      description: "Tighten draft",
       onClick: ({ sendMessage }) => {
         sendMessage({
           role: "user",
           parts: [
             {
               type: "text",
-              text: "Please add final polish and check for grammar, add section titles for better structure, and ensure everything reads smoothly.",
+              text: "Review this draft. Fix grammar and add headings only where they help. Keep the author's voice.",
             },
           ],
         });
@@ -169,14 +169,14 @@ export const textArtifact = new Artifact<"text", TextArtifactMetadata>({
     },
     {
       icon: <MessageIcon />,
-      description: "Request suggestions",
+      description: "Suggest improvements",
       onClick: ({ sendMessage }) => {
         sendMessage({
           role: "user",
           parts: [
             {
               type: "text",
-              text: "Please add suggestions you have that could improve the writing.",
+              text: "Review this draft. Suggest only changes that make it clearer or more precise. Keep the author's voice.",
             },
           ],
         });

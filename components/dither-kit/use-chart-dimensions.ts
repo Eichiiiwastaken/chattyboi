@@ -4,10 +4,8 @@ export type Dimensions = { width: number; height: number };
 
 /**
  * Tracks an element's CSS pixel size via {@link ResizeObserver}. Uses
- * `clientWidth`/`clientHeight` (the layout size) rather than
- * `getBoundingClientRect()` so a parent `layoutId` morph — which scales the
- * element via a transform — can't trick the chart into measuring a scaled size
- * and locking its canvas to it.
+ * `clientWidth` and `clientHeight` rather than `getBoundingClientRect()`. A
+ * transformed parent can change the latter without changing layout size.
  */
 export function useChartDimensions<T extends HTMLElement>() {
   const ref = useRef<T>(null);
