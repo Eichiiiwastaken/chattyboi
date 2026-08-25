@@ -124,6 +124,20 @@ export function ChatShell() {
     [setInput]
   );
 
+  const handleStarterPrompt = useCallback(
+    (prompt: string) => {
+      setInput(prompt);
+      window.requestAnimationFrame(() => {
+        document
+          .querySelector<HTMLTextAreaElement>(
+            "[data-testid='multimodal-input']"
+          )
+          ?.focus();
+      });
+    },
+    [setInput]
+  );
+
   const handleRetryMessage = useCallback(
     async (message: ChatMessage, modelId?: string) => {
       const retryModelId = modelId ?? currentModelId;
@@ -248,6 +262,7 @@ export function ChatShell() {
               onLoadEarlierMessages={loadEarlierMessages}
               onQuoteSelection={handleQuoteSelection}
               onRetryMessage={handleRetryMessage}
+              onSelectStarterPrompt={handleStarterPrompt}
               regenerate={regenerate}
               searchSources={searchSources}
               selectedModelId={currentModelId}

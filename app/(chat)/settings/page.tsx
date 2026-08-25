@@ -5,7 +5,15 @@ import {
   BarChart3Icon,
   ChevronDownIcon,
   Copy,
+  LeafIcon,
+  MonitorIcon,
+  MoonIcon,
   SlidersHorizontalIcon,
+  SparklesIcon,
+  StarIcon,
+  SunIcon,
+  SunsetIcon,
+  WavesIcon,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useCallback, useEffect, useState } from "react";
@@ -102,7 +110,7 @@ function ModelSelectorCompact({
 }
 
 export default function SettingsPage() {
-  const { resolvedTheme, setTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
   const [origin, setOrigin] = useState("");
   const [activeTab, setActiveTab] = useState<"preferences" | "usage">(
     "preferences"
@@ -243,18 +251,95 @@ export default function SettingsPage() {
               <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
                 Appearance
               </h2>
-              <div className="space-y-3 rounded-xl border border-border/40 bg-card/50 p-5">
-                <div className="flex items-center justify-between">
-                  <Label className="text-[13px]" htmlFor="light-mode">
-                    Light mode
-                  </Label>
-                  <Switch
-                    checked={resolvedTheme === "light"}
-                    id="light-mode"
-                    onCheckedChange={(checked) =>
-                      setTheme(checked ? "light" : "dark")
-                    }
-                  />
+              <div className="space-y-4 rounded-xl border border-border/40 bg-card/50 p-5">
+                <div>
+                  <Label className="text-[13px]">Theme</Label>
+                  <p className="mt-1 text-[12px] text-muted-foreground">
+                    Choose the atmosphere that feels best to chat in.
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    {
+                      value: "system",
+                      label: "System",
+                      icon: MonitorIcon,
+                      preview: "bg-gradient-to-br from-white to-neutral-900",
+                    },
+                    {
+                      value: "light",
+                      label: "Light",
+                      icon: SunIcon,
+                      preview: "bg-[#f7f7f6]",
+                    },
+                    {
+                      value: "dark",
+                      label: "Dark",
+                      icon: MoonIcon,
+                      preview: "bg-[#171717]",
+                    },
+                    {
+                      value: "rose",
+                      label: "Rosé",
+                      icon: SparklesIcon,
+                      preview:
+                        "bg-[radial-gradient(circle_at_top_right,#71304e,#21141e_65%)]",
+                    },
+                    {
+                      value: "ocean",
+                      label: "Ocean",
+                      icon: WavesIcon,
+                      preview:
+                        "bg-[radial-gradient(circle_at_top_right,#16899b,#0b1924_65%)]",
+                    },
+                    {
+                      value: "forest",
+                      label: "Forest",
+                      icon: LeafIcon,
+                      preview:
+                        "bg-[radial-gradient(circle_at_top_right,#398b4d,#101b16_65%)]",
+                    },
+                    {
+                      value: "sunset",
+                      label: "Sunset",
+                      icon: SunsetIcon,
+                      preview:
+                        "bg-[radial-gradient(circle_at_top_right,#c84f35,#21140f_65%)]",
+                    },
+                    {
+                      value: "midnight",
+                      label: "Midnight",
+                      icon: StarIcon,
+                      preview:
+                        "bg-[radial-gradient(circle_at_top_right,#5664a8,#131522_65%)]",
+                    },
+                  ].map((option) => {
+                    const Icon = option.icon;
+                    const isSelected = (theme ?? "system") === option.value;
+
+                    return (
+                      <button
+                        aria-pressed={isSelected}
+                        className={`group flex items-center gap-3 rounded-lg border p-2.5 text-left transition-colors ${
+                          isSelected
+                            ? "border-primary/45 bg-primary/8 text-foreground"
+                            : "border-border/50 text-muted-foreground hover:border-border hover:bg-accent/60 hover:text-foreground"
+                        }`}
+                        key={option.value}
+                        onClick={() => setTheme(option.value)}
+                        type="button"
+                      >
+                        <span
+                          className={`relative flex size-9 shrink-0 items-center justify-center rounded-md border border-white/10 shadow-inner ${option.preview}`}
+                        >
+                          <Icon className="size-3.5 text-white drop-shadow-sm" />
+                        </span>
+                        <span className="text-[13px] font-medium">
+                          {option.label}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </section>

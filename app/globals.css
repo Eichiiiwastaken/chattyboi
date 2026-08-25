@@ -1,7 +1,8 @@
 @import "tailwindcss";
 @import "katex/dist/katex.min.css";
 
-@custom-variant dark (&:is(.dark, .dark *));
+/* biome-ignore format: Tailwind requires the variant name and selector on one line. */
+@custom-variant dark (&:is(.dark, .dark *, .rose, .rose *, .ocean, .ocean *, .forest, .forest *, .sunset, .sunset *, .midnight, .midnight *));
 
 @plugin "tailwindcss-animate";
 @plugin "@tailwindcss/typography";
@@ -136,6 +137,231 @@
   --shadow-composer-focus:
     0 0 0 1px oklch(1 0 0 / 0.1), 0 4px 16px -4px oklch(0 0 0 / 0.3),
     inset 0 1px 0 oklch(1 0 0 / 0.04);
+}
+
+/* A warmer, T3-inspired dark palette. Kept as a separate theme so the
+   neutral dark appearance remains available. */
+.rose {
+  color-scheme: dark;
+  --background: #21141e;
+  --foreground: #f9f8fb;
+  --card: #2b202d;
+  --card-foreground: #f9f8fb;
+  --popover: #302231;
+  --popover-foreground: #f9f8fb;
+  --primary: #b83b6b;
+  --primary-foreground: #fff7fb;
+  --secondary: #382638;
+  --secondary-foreground: #dacbd9;
+  --muted: #1b1119;
+  --muted-foreground: #a995a6;
+  --accent: #442a3f;
+  --accent-foreground: #fff5fb;
+  --destructive: #f17676;
+  --border: #493144;
+  --input: #493144;
+  --ring: #d75a88;
+  --chart-1: #e35f91;
+  --chart-2: #b597f4;
+  --chart-3: #f1ad68;
+  --chart-4: #79c7b2;
+  --chart-5: #dc7ee8;
+  --sidebar: #180f17;
+  --sidebar-foreground: #dacbd9;
+  --sidebar-primary: #b83b6b;
+  --sidebar-primary-foreground: #fff7fb;
+  --sidebar-accent: rgb(184 59 107 / 16%);
+  --sidebar-accent-foreground: #fff5fb;
+  --sidebar-border: #382536;
+  --sidebar-ring: #d75a88;
+
+  --shadow-card:
+    inset 0 1px 0 rgb(255 235 248 / 5%), 0 1px 3px rgb(15 4 12 / 25%);
+  --shadow-float:
+    0 0 0 1px rgb(255 219 241 / 7%), 0 16px 48px -6px rgb(15 4 12 / 45%),
+    0 6px 12px -2px rgb(15 4 12 / 28%);
+  --shadow-composer:
+    0 1px 3px rgb(15 4 12 / 28%), inset 0 1px 0 rgb(255 235 248 / 4%);
+  --shadow-composer-focus:
+    0 0 0 1px rgb(215 90 136 / 25%), 0 4px 20px -4px rgb(114 24 71 / 35%),
+    inset 0 1px 0 rgb(255 235 248 / 5%);
+  --shadow-glow: 0 0 24px rgb(184 59 107 / 18%);
+}
+
+.ocean {
+  color-scheme: dark;
+  --background: #0b1924;
+  --foreground: #f2fbfc;
+  --card: #112634;
+  --card-foreground: #f2fbfc;
+  --popover: #152d3c;
+  --popover-foreground: #f2fbfc;
+  --primary: #25c9d8;
+  --primary-foreground: #04171b;
+  --secondary: #173544;
+  --secondary-foreground: #c5e8eb;
+  --muted: #08141d;
+  --muted-foreground: #86a9b2;
+  --accent: #194153;
+  --accent-foreground: #effdff;
+  --destructive: #ff7979;
+  --border: #244758;
+  --input: #244758;
+  --ring: #4adce7;
+  --chart-1: #25c9d8;
+  --chart-2: #6d9df5;
+  --chart-3: #64d8a1;
+  --chart-4: #b691f1;
+  --chart-5: #f1bd61;
+  --sidebar: #07131c;
+  --sidebar-foreground: #c5e8eb;
+  --sidebar-primary: #25c9d8;
+  --sidebar-primary-foreground: #04171b;
+  --sidebar-accent: rgb(37 201 216 / 14%);
+  --sidebar-accent-foreground: #effdff;
+  --sidebar-border: #193746;
+  --sidebar-ring: #4adce7;
+  --shadow-card:
+    inset 0 1px 0 rgb(224 252 255 / 5%), 0 1px 3px rgb(1 10 16 / 28%);
+  --shadow-float:
+    0 0 0 1px rgb(206 248 255 / 7%), 0 16px 48px -6px rgb(1 10 16 / 48%);
+  --shadow-composer:
+    0 1px 3px rgb(1 10 16 / 32%), inset 0 1px 0 rgb(224 252 255 / 4%);
+  --shadow-composer-focus:
+    0 0 0 1px rgb(74 220 231 / 28%), 0 4px 20px -4px rgb(20 145 164 / 35%);
+  --shadow-glow: 0 0 24px rgb(37 201 216 / 18%);
+}
+
+.forest {
+  color-scheme: dark;
+  --background: #101b16;
+  --foreground: #f3faf5;
+  --card: #182820;
+  --card-foreground: #f3faf5;
+  --popover: #1d3026;
+  --popover-foreground: #f3faf5;
+  --primary: #67d77f;
+  --primary-foreground: #07170b;
+  --secondary: #243b2e;
+  --secondary-foreground: #cfe6d5;
+  --muted: #0c1712;
+  --muted-foreground: #91aa98;
+  --accent: #294735;
+  --accent-foreground: #f1fff4;
+  --destructive: #ff7c78;
+  --border: #34513f;
+  --input: #34513f;
+  --ring: #82e596;
+  --chart-1: #67d77f;
+  --chart-2: #5dc5ad;
+  --chart-3: #d5c66b;
+  --chart-4: #89a8f2;
+  --chart-5: #e68da6;
+  --sidebar: #0a140f;
+  --sidebar-foreground: #cfe6d5;
+  --sidebar-primary: #67d77f;
+  --sidebar-primary-foreground: #07170b;
+  --sidebar-accent: rgb(103 215 127 / 14%);
+  --sidebar-accent-foreground: #f1fff4;
+  --sidebar-border: #263e30;
+  --sidebar-ring: #82e596;
+  --shadow-card:
+    inset 0 1px 0 rgb(230 255 236 / 5%), 0 1px 3px rgb(2 12 6 / 28%);
+  --shadow-float:
+    0 0 0 1px rgb(216 255 225 / 7%), 0 16px 48px -6px rgb(2 12 6 / 48%);
+  --shadow-composer:
+    0 1px 3px rgb(2 12 6 / 32%), inset 0 1px 0 rgb(230 255 236 / 4%);
+  --shadow-composer-focus:
+    0 0 0 1px rgb(130 229 150 / 28%), 0 4px 20px -4px rgb(45 146 70 / 35%);
+  --shadow-glow: 0 0 24px rgb(103 215 127 / 18%);
+}
+
+.sunset {
+  color-scheme: dark;
+  --background: #21140f;
+  --foreground: #fff8f1;
+  --card: #2e1e17;
+  --card-foreground: #fff8f1;
+  --popover: #35221a;
+  --popover-foreground: #fff8f1;
+  --primary: #ff8a3d;
+  --primary-foreground: #251006;
+  --secondary: #422b21;
+  --secondary-foreground: #f0d3bf;
+  --muted: #1a100c;
+  --muted-foreground: #b29a8b;
+  --accent: #513025;
+  --accent-foreground: #fff6ed;
+  --destructive: #ff716d;
+  --border: #593a2c;
+  --input: #593a2c;
+  --ring: #ffa05f;
+  --chart-1: #ff8a3d;
+  --chart-2: #f15d74;
+  --chart-3: #f5c45b;
+  --chart-4: #ae8aec;
+  --chart-5: #66c6ae;
+  --sidebar: #180e0b;
+  --sidebar-foreground: #f0d3bf;
+  --sidebar-primary: #ff8a3d;
+  --sidebar-primary-foreground: #251006;
+  --sidebar-accent: rgb(255 138 61 / 14%);
+  --sidebar-accent-foreground: #fff6ed;
+  --sidebar-border: #43291f;
+  --sidebar-ring: #ffa05f;
+  --shadow-card:
+    inset 0 1px 0 rgb(255 239 225 / 5%), 0 1px 3px rgb(18 6 2 / 28%);
+  --shadow-float:
+    0 0 0 1px rgb(255 229 210 / 7%), 0 16px 48px -6px rgb(18 6 2 / 48%);
+  --shadow-composer:
+    0 1px 3px rgb(18 6 2 / 32%), inset 0 1px 0 rgb(255 239 225 / 4%);
+  --shadow-composer-focus:
+    0 0 0 1px rgb(255 160 95 / 30%), 0 4px 20px -4px rgb(191 75 25 / 38%);
+  --shadow-glow: 0 0 24px rgb(255 138 61 / 20%);
+}
+
+.midnight {
+  color-scheme: dark;
+  --background: #131522;
+  --foreground: #f5f5fb;
+  --card: #1c2031;
+  --card-foreground: #f5f5fb;
+  --popover: #22263a;
+  --popover-foreground: #f5f5fb;
+  --primary: #8e9df5;
+  --primary-foreground: #101321;
+  --secondary: #282d43;
+  --secondary-foreground: #d8dbef;
+  --muted: #10121d;
+  --muted-foreground: #9499b3;
+  --accent: #303652;
+  --accent-foreground: #f4f5ff;
+  --destructive: #ff777c;
+  --border: #3a405d;
+  --input: #3a405d;
+  --ring: #9eacf8;
+  --chart-1: #8e9df5;
+  --chart-2: #69c5c5;
+  --chart-3: #d9b76c;
+  --chart-4: #c093e5;
+  --chart-5: #e985a4;
+  --sidebar: #0e101a;
+  --sidebar-foreground: #d8dbef;
+  --sidebar-primary: #8e9df5;
+  --sidebar-primary-foreground: #101321;
+  --sidebar-accent: rgb(142 157 245 / 14%);
+  --sidebar-accent-foreground: #f4f5ff;
+  --sidebar-border: #2b3047;
+  --sidebar-ring: #9eacf8;
+  --shadow-card:
+    inset 0 1px 0 rgb(237 239 255 / 5%), 0 1px 3px rgb(4 5 14 / 30%);
+  --shadow-float:
+    0 0 0 1px rgb(225 229 255 / 7%), 0 16px 48px -6px rgb(4 5 14 / 52%);
+  --shadow-composer:
+    0 1px 3px rgb(4 5 14 / 34%), inset 0 1px 0 rgb(237 239 255 / 4%);
+  --shadow-composer-focus:
+    0 0 0 1px rgb(158 172 248 / 28%), 0 4px 20px -4px rgb(73 88 183 / 38%);
+  --shadow-glow: 0 0 24px rgb(142 157 245 / 18%);
 }
 
 @layer base {

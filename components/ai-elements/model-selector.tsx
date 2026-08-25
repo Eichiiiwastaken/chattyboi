@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import { isDarkTheme } from "@/lib/themes";
 
 type SvglRoute =
   | string
@@ -331,7 +332,7 @@ export const ModelSelectorLogo = ({
   const src = route
     ? typeof route === "string"
       ? route
-      : resolvedTheme === "dark"
+      : isDarkTheme(resolvedTheme)
         ? route.dark
         : route.light
     : `https://models.dev/logos/${provider}.svg`;

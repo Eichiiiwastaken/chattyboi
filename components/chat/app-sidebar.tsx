@@ -67,7 +67,7 @@ export function AppSidebar({ user }: { user: User | undefined }) {
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton
-                  className="h-8 rounded-lg border border-sidebar-border text-[13px] text-sidebar-foreground/70 transition-colors duration-150 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                  className="h-8 rounded-lg border border-sidebar-primary/25 bg-sidebar-primary/15 text-[13px] text-sidebar-foreground shadow-[var(--shadow-card)] transition-colors duration-150 hover:border-sidebar-primary/35 hover:bg-sidebar-primary/25 hover:text-sidebar-foreground"
                   onClick={() => {
                     setOpenMobile(false);
                     router.push("/");

@@ -8,6 +8,11 @@ import { SessionProvider } from "next-auth/react";
 
 const LIGHT_THEME_COLOR = "hsl(0 0% 100%)";
 const DARK_THEME_COLOR = "hsl(240deg 10% 3.92%)";
+const ROSE_THEME_COLOR = "#21141e";
+const OCEAN_THEME_COLOR = "#0b1924";
+const FOREST_THEME_COLOR = "#101b16";
+const SUNSET_THEME_COLOR = "#21140f";
+const MIDNIGHT_THEME_COLOR = "#131522";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXTAUTH_URL ?? "http://localhost:3232"),
@@ -48,8 +53,20 @@ const THEME_COLOR_SCRIPT = `\
     document.head.appendChild(meta);
   }
   function updateThemeColor() {
-    var isDark = html.classList.contains('dark');
-    meta.setAttribute('content', isDark ? '${DARK_THEME_COLOR}' : '${LIGHT_THEME_COLOR}');
+    var themeColor = html.classList.contains('rose')
+      ? '${ROSE_THEME_COLOR}'
+      : html.classList.contains('ocean')
+        ? '${OCEAN_THEME_COLOR}'
+        : html.classList.contains('forest')
+          ? '${FOREST_THEME_COLOR}'
+          : html.classList.contains('sunset')
+            ? '${SUNSET_THEME_COLOR}'
+            : html.classList.contains('midnight')
+              ? '${MIDNIGHT_THEME_COLOR}'
+              : html.classList.contains('dark')
+                ? '${DARK_THEME_COLOR}'
+                : '${LIGHT_THEME_COLOR}';
+    meta.setAttribute('content', themeColor);
   }
   var observer = new MutationObserver(updateThemeColor);
   observer.observe(html, { attributes: true, attributeFilter: ['class'] });
@@ -81,6 +98,15 @@ export default function RootLayout({
           defaultTheme="system"
           disableTransitionOnChange
           enableSystem
+          themes={[
+            "light",
+            "dark",
+            "rose",
+            "ocean",
+            "forest",
+            "sunset",
+            "midnight",
+          ]}
         >
           <SessionProvider
             basePath={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/api/auth`}

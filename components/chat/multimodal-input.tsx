@@ -253,7 +253,7 @@ function PureMultimodalInput({
         break;
       }
       case "theme":
-        setTheme(resolvedTheme === "dark" ? "light" : "dark");
+        setTheme(resolvedTheme === "light" ? "dark" : "light");
         break;
       case "delete":
         if (isOneTimeChat) {
